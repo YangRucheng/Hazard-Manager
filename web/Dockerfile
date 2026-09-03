@@ -3,6 +3,11 @@ FROM node:24-alpine AS builder
 
 WORKDIR /build
 
+# 构建期可传入后端 HOST（如 https://hazard-manager.qcloud.19890605.xyz），
+# 未传则产物使用相对 /api/v1（由 nginx 反代）。用法：docker build --build-arg HOST=https://xxx .
+ARG HOST
+ENV HOST=${HOST:-}
+
 # pnpm 版本与仓库一致
 RUN corepack enable && corepack prepare pnpm@11.7.0 --activate
 

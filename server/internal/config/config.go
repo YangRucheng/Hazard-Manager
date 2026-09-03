@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -22,7 +21,6 @@ type Config struct {
 	AdminPassword  string
 	UploadDir      string
 	MaxUploadBytes int64
-	CORSOrigins    []string
 }
 
 // Load 读取配置。ADMIN_PASSWORD 与 JWT_SECRET 为必填项，缺失返回错误。
@@ -36,7 +34,6 @@ func Load() (*Config, error) {
 		DBName:         getEnv("DB_NAME", "hazard_system"),
 		UploadDir:      getEnv("UPLOAD_DIR", "./data/uploads"),
 		MaxUploadBytes: int64(getEnvInt("MAX_UPLOAD_BYTES", 10*1024*1024)), // 默认 10MB
-		CORSOrigins:    splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")),
 	}
 
 	cfg.JWTSecret = os.Getenv("JWT_SECRET")
@@ -81,15 +78,4 @@ func getEnvInt(key string, def int) int {
 		}
 	}
 	return def
-}
-
-func splitCSV(s string) []string {
-	parts := strings.Split(s, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
 }

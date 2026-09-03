@@ -77,6 +77,27 @@ pnpm dev             # http://127.0.0.1:5173（/api 自动代理到 8090）
 
 > 后端换端口时同步修改 `web/vite.config.ts` 的 proxy target。
 
+### 5. 生产构建与后端地址（HOST）
+
+前端请求的 API base 由构建期环境变量 `HOST` 决定（该值即后端接口的地址），
+`vite.config.ts` 将其注入为 `__API_HOST__`，`web/src/api/config.ts` 负责解析：
+
+```bash
+HOST=https://hazard-manager.qcloud.19890605.xyz pnpm build
+```
+
+- `HOST` 为裸域名（如 `https://host`）→ 前端请求 `${HOST}/api/v1/*`
+- `HOST` 已含路径（如 `https://host/api/v1`）→ 直接使用
+- 未传 `HOST` → 回退相对 `/api/v1`（开发经 Vite proxy；生产由 nginx 反代到后端）
+
+镜像构建同样支持传参：`docker build --build-arg HOST=https://xxx .`（见 `web/Dockerfile`）。
+
+### 6. 跨域（CORS）
+
+后端默认放开跨域：按请求 `Origin` 回显，缺失时按 `Referer` 解析出来源，
+两者皆无则回显 `*`。鉴权使用 `Authorization: Bearer`（非 Cookie），
+无需精确来源白名单，前端部署在任何域名均可访问。
+
 ## 接口契约与代码生成
 
 修改任何字段/端点，只改 `api/openapi.yaml`，然后重新生成两端：

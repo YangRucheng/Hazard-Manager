@@ -1,5 +1,8 @@
 # 环境与密钥
 server/.env
+web/.env
+web/.env.local
+web/.env.*.local
 *.env.local
 
 # 运行时数据（图片上传目录）
