@@ -1,0 +1,20 @@
+# 环境与密钥
+server/.env
+*.env.local
+
+# 运行时数据（图片上传目录）
+server/data/
+
+# 前端
+web/node_modules/
+web/dist/
+
+# Go 构建产物
+server/bin/
+*.exe
+
+# 系统与编辑器
+.DS_Store
+.idea/
+.vscode/
+*.log

@@ -1,0 +1,755 @@
+openapi: 3.0.3
+info:
+  title: 电气车间隐患闭环系统 API
+  description: |
+    电气车间隐患闭环管理系统的后端接口契约，是前后端对齐的唯一依据。
+    鉴权：除 /auth/login 外所有接口均需携带 `Authorization: Bearer <JWT>`；
+    管理端接口要求 JWT 中 user_type == "admin"。
+  version: 1.0.0
+servers:
+  - url: http://localhost:8090/api/v1
+tags:
+  - name: auth
+    description: 鉴权
+  - name: hazards
+    description: 隐患记录
+  - name: units
+    description: 责任单位枚举
+  - name: hazard-types
+    description: 隐患类型/分类枚举（单表两级）
+  - name: images
+    description: 图片（摘要去重 + 缩略图）
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: 管理员登录（签发 JWT）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功，返回 JWT 令牌
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: getCurrentUser
+      summary: 当前登录用户信息（用于校验 token 有效性）
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /hazards:
+    get:
+      tags: [hazards]
+      operationId: listHazards
+      summary: 隐患记录分页列表（含筛选）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/HazardStatus'
+        - name: level
+          in: query
+          schema:
+            $ref: '#/components/schemas/HazardLevel'
+        - name: typeId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: categoryId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: unitId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: area
+          in: query
+          schema: { type: string, maxLength: 128 }
+        - name: keyword
+          in: query
+          description: 模糊匹配 隐患描述/建议整改方案/备注/检查区域/检查人员/责任人
+          schema: { type: string }
+        - name: dateFrom
+          in: query
+          description: 检查日期起（含）
+          schema: { type: string, format: date }
+        - name: dateTo
+          in: query
+          description: 检查日期止（含）
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: 分页结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HazardListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [hazards]
+      operationId: createHazard
+      summary: 新增隐患记录（默认值/联动逻辑在服务端兜底）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HazardCreateRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hazard'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /hazards/stats:
+    get:
+      tags: [hazards]
+      operationId: getHazardStats
+      summary: 隐患概览统计（按状态/等级计数 + 逾期未整改数）
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 统计结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HazardStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /hazards/{id}:
+    get:
+      tags: [hazards]
+      operationId: getHazard
+      summary: 隐患记录详情
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: 详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hazard'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [hazards]
+      operationId: updateHazard
+      summary: 更新隐患记录（部分字段）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HazardUpdateRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hazard'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [hazards]
+      operationId: deleteHazard
+      summary: 删除隐患记录（软删除）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '204':
+          description: 删除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /units:
+    get:
+      tags: [units]
+      operationId: listUnits
+      summary: 责任单位列表（下拉/管理页用，含停用项）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string, maxLength: 128 }
+      responses:
+        '200':
+          description: 单位列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResponsibleUnit'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [units]
+      operationId: createUnit
+      summary: 新增责任单位
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnitCreateRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponsibleUnit'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /units/{id}:
+    put:
+      tags: [units]
+      operationId: updateUnit
+      summary: 更新责任单位
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnitUpdateRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponsibleUnit'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [units]
+      operationId: deleteUnit
+      summary: 删除责任单位（被隐患引用时拒绝）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '204':
+          description: 删除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /hazard-types:
+    get:
+      tags: [hazard-types]
+      operationId: listHazardTypes
+      summary: 隐患类型/分类全量（扁平，含两级，前端组树）
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 类型列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HazardType'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [hazard-types]
+      operationId: createHazardType
+      summary: 新增隐患类型（parentId=0）或分类（parentId=大类id）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HazardTypeCreateRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HazardType'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /hazard-types/{id}:
+    put:
+      tags: [hazard-types]
+      operationId: updateHazardType
+      summary: 更新隐患类型/分类
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HazardTypeUpdateRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HazardType'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [hazard-types]
+      operationId: deleteHazardType
+      summary: 删除隐患类型/分类（存在子分类或被隐患引用时拒绝）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '204':
+          description: 删除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /images:
+    post:
+      tags: [images]
+      operationId: uploadImage
+      summary: 上传图片（SHA-256 摘要去重：同图返回既有 uuid，不重复保存）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 图片文件，白名单 jpeg/png/webp/gif，默认上限 10MB
+      responses:
+        '200':
+          description: 上传成功（duplicate=true 表示命中既有摘要）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageInfo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /images/{id}:
+    get:
+      tags: [images]
+      operationId: getImage
+      summary: 获取原图（按 uuid）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-f]{32}$' }
+      responses:
+        '200':
+          description: 图片二进制
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+            image/gif:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /images/{id}/thumbnail:
+    get:
+      tags: [images]
+      operationId: getImageThumbnail
+      summary: 获取缩略图（缺失时回退原图）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-f]{32}$' }
+      responses:
+        '200':
+          description: 缩略图二进制（JPEG）
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, description: 错误码，如 INVALID_CREDENTIALS / NOT_FOUND / VALIDATION_ERROR }
+        message: { type: string, description: 人类可读错误信息 }
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, example: admin }
+        password: { type: string, format: password, example: '********' }
+    LoginResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string, description: JWT 访问令牌 }
+        user:
+          $ref: '#/components/schemas/UserInfo'
+    UserInfo:
+      type: object
+      required: [username, userType]
+      properties:
+        username: { type: string }
+        userType:
+          type: string
+          enum: [admin, mini]
+          description: admin=管理用户；mini=小程序用户（预留）
+    HazardStatus:
+      type: string
+      enum: [待整改, 整改受阻, 已整改]
+    HazardLevel:
+      type: string
+      enum: [一般隐患, 重大隐患]
+    Hazard:
+      type: object
+      required: [id, inspectionArea, inspectionDate, inspector, description, unitId, unitName, person, dueDate, status, typeId, typeName, categoryId, categoryName, level, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int64 }
+        inspectionArea: { type: string, description: 检查区域 }
+        inspectionDate: { type: string, format: date, description: 检查日期 YYYY-MM-DD }
+        inspector: { type: string, description: 检查人员 }
+        description: { type: string, description: 隐患描述 }
+        suggestion: { type: string, nullable: true, description: 建议整改方案 }
+        unitId: { type: integer, format: int64, description: 责任单位 id }
+        unitName: { type: string, description: 责任单位名称（JOIN 返回） }
+        person: { type: string, description: 责任人（单位冗余快照） }
+        dueDate: { type: string, format: date, description: 要求完成整改时间，默认检查日期+7天 }
+        recheckPerson: { type: string, nullable: true, description: 复查人员 }
+        beforeImageIds:
+          type: array
+          items: { type: string, description: 图片 uuid }
+          description: 整改前图片 uuid 列表
+        status:
+          $ref: '#/components/schemas/HazardStatus'
+        afterImageIds:
+          type: array
+          items: { type: string }
+          description: 整改后图片 uuid 列表
+        typeId: { type: integer, format: int64, description: 隐患类型（大类）id }
+        typeName: { type: string, description: 隐患类型名称 }
+        categoryId: { type: integer, format: int64, description: 隐患分类（小类）id }
+        categoryName: { type: string, description: 隐患分类名称 }
+        level:
+          $ref: '#/components/schemas/HazardLevel'
+        remark: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    HazardCreateRequest:
+      type: object
+      required: [description, unitId, typeId, categoryId]
+      properties:
+        inspectionArea: { type: string, maxLength: 128, default: 华星现场 }
+        inspectionDate: { type: string, format: date, description: 缺省=今天 }
+        inspector: { type: string, maxLength: 64, default: 电气自查 }
+        description: { type: string, description: 隐患描述（必填） }
+        suggestion: { type: string, nullable: true }
+        unitId: { type: integer, format: int64, description: 责任单位 id（必填，责任人由此关联） }
+        dueDate: { type: string, format: date, description: 缺省=检查日期+7天 }
+        recheckPerson: { type: string, maxLength: 64, nullable: true, description: 缺省=检查人员 }
+        beforeImageIds:
+          type: array
+          maxItems: 20
+          items: { type: string, pattern: '^[0-9a-f]{32}$' }
+        status:
+          allOf:
+            - $ref: '#/components/schemas/HazardStatus'
+          default: 待整改
+        afterImageIds:
+          type: array
+          maxItems: 20
+          items: { type: string, pattern: '^[0-9a-f]{32}$' }
+        typeId: { type: integer, format: int64, description: 隐患类型（大类）id（必填） }
+        categoryId: { type: integer, format: int64, description: 隐患分类（小类）id（必填，须属于 typeId） }
+        level:
+          allOf:
+            - $ref: '#/components/schemas/HazardLevel'
+          default: 一般隐患
+        remark: { type: string, nullable: true }
+    HazardUpdateRequest:
+      type: object
+      description: 全部字段可选，仅更新提供的字段
+      properties:
+        inspectionArea: { type: string, maxLength: 128 }
+        inspectionDate: { type: string, format: date }
+        inspector: { type: string, maxLength: 64 }
+        description: { type: string }
+        suggestion: { type: string, nullable: true }
+        unitId: { type: integer, format: int64 }
+        dueDate: { type: string, format: date }
+        recheckPerson: { type: string, maxLength: 64, nullable: true }
+        beforeImageIds:
+          type: array
+          maxItems: 20
+          items: { type: string, pattern: '^[0-9a-f]{32}$' }
+        status:
+          $ref: '#/components/schemas/HazardStatus'
+        afterImageIds:
+          type: array
+          maxItems: 20
+          items: { type: string, pattern: '^[0-9a-f]{32}$' }
+        typeId: { type: integer, format: int64 }
+        categoryId: { type: integer, format: int64 }
+        level:
+          $ref: '#/components/schemas/HazardLevel'
+        remark: { type: string, nullable: true }
+    HazardListResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Hazard'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    Pagination:
+      type: object
+      required: [page, pageSize, total]
+      properties:
+        page: { type: integer, description: 当前页 }
+        pageSize: { type: integer, description: 每页条数 }
+        total: { type: integer, format: int64, description: 总条数 }
+    HazardStats:
+      type: object
+      required: [pending, blocked, done, overdue]
+      properties:
+        pending: { type: integer, description: 待整改数 }
+        blocked: { type: integer, description: 整改受阻数 }
+        done: { type: integer, description: 已整改数 }
+        overdue: { type: integer, description: 逾期未整改数（dueDate 早于今天且状态非已整改） }
+    ResponsibleUnit:
+      type: object
+      required: [id, name, person, sort, status, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string, description: 责任单位名称 }
+        person: { type: string, description: 责任人（一一对应） }
+        remark: { type: string, nullable: true }
+        sort: { type: integer, description: 排序（小在前） }
+        status: { type: integer, enum: [0, 1], description: 0=停用 1=启用 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    UnitCreateRequest:
+      type: object
+      required: [name, person]
+      properties:
+        name: { type: string, maxLength: 128 }
+        person: { type: string, maxLength: 64 }
+        remark: { type: string, nullable: true }
+        sort: { type: integer, default: 0 }
+        status: { type: integer, enum: [0, 1], default: 1 }
+    UnitUpdateRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 128 }
+        person: { type: string, maxLength: 64 }
+        remark: { type: string, nullable: true }
+        sort: { type: integer }
+        status: { type: integer, enum: [0, 1] }
+    HazardType:
+      type: object
+      required: [id, parentId, name, sort, status, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int64 }
+        parentId: { type: integer, format: int64, description: 0=大类（隐患类型）；>0=小类（隐患分类），指向大类 id }
+        name: { type: string }
+        sort: { type: integer }
+        status: { type: integer, enum: [0, 1] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    HazardTypeCreateRequest:
+      type: object
+      required: [parentId, name]
+      properties:
+        parentId: { type: integer, format: int64, description: 0=大类；>0 时须为已存在的大类 id }
+        name: { type: string, maxLength: 128 }
+        sort: { type: integer, default: 0 }
+        status: { type: integer, enum: [0, 1], default: 1 }
+    HazardTypeUpdateRequest:
+      type: object
+      properties:
+        parentId: { type: integer, format: int64 }
+        name: { type: string, maxLength: 128 }
+        sort: { type: integer }
+        status: { type: integer, enum: [0, 1] }
+    ImageInfo:
+      type: object
+      required: [id, digest, mimeType, sizeBytes, url, thumbnailUrl]
+      properties:
+        id: { type: string, description: uuid（32 位十六进制，其他表只存此值） }
+        digest: { type: string, description: SHA-256 摘要（十六进制，去重依据） }
+        mimeType: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+        url: { type: string, description: '相对路径，形如 /api/v1/images/860e...' }
+        thumbnailUrl: { type: string, description: '相对路径，形如 /api/v1/images/860e.../thumbnail' }
+        duplicate: { type: boolean, default: false, description: 是否命中既有摘要（未重复保存） }
+  responses:
+    Unauthorized:
+      description: 未认证或令牌无效/过期
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: 请求体/参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unprocessable:
+      description: 业务校验失败（如分类不属于类型、责任单位无责任人）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: 资源被引用无法删除
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
