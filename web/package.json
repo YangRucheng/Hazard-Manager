@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "typecheck": "vue-tsc -b --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "schema": "openapi-typescript ../api/openapi.yaml -o src/api/schema.d.ts",
     "preview": "vite preview"
   },
@@ -24,6 +26,7 @@
     "openapi-typescript": "^7.13.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.2",
+    "vitest": "^4.1.11",
     "vue-tsc": "^3.3.11"
   }
 }

@@ -1,0 +1,216 @@
+name: 后端：基础测试·契约·端到端·镜像
+
+# 后端相关改动才触发（server/ 或契约 api/ 变更时两端都要校验，故也监听 api/）。
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "server/**"
+      - "api/**"
+      - ".github/workflows/ci-backend.yml"
+  pull_request:
+    paths:
+      - "server/**"
+      - "api/**"
+      - ".github/workflows/ci-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 腾讯云容器镜像仓库 CCR（个人版/企业版均可，registry 与 namespace 可用仓库变量覆盖）
+  REGISTRY: ${{ vars.TENCENT_CCR_REGISTRY || 'ccr.ccs.tencentyun.com' }}
+  IMAGE_NAMESPACE: ${{ vars.TENCENT_CCR_NAMESPACE || 'yangrucheng' }}
+  IMAGE: hazard-manager-server
+  # 仅 push 到 master 时才推送镜像；PR/其他分支只做构建测试，绝不推送
+  SHOULD_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+
+jobs:
+  # ---------- 基础测试 ----------
+  unit-tests:
+    name: 基础测试（gofmt / vet / build / go test 含集成）
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: hazard_system
+          MYSQL_USER: hazard
+          MYSQL_PASSWORD: hazard_dev_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+
+      - name: gofmt 格式检查
+        working-directory: server
+        run: |
+          UNFORMATTED="$(gofmt -l ./internal ./cmd)"
+          if [[ -n "$UNFORMATTED" ]]; then
+            echo "以下文件未格式化："
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+          echo "✅ gofmt 通过"
+
+      - name: go vet
+        working-directory: server
+        run: go vet ./...
+
+      - name: go build
+        working-directory: server
+        run: go build ./...
+
+      - name: 运行单元测试 + 集成测试（真实 MySQL）
+        working-directory: server
+        env:
+          TEST_DB_DSN: "hazard:hazard_dev_password@tcp(127.0.0.1:3306)/hazard_system?charset=utf8mb4&parseTime=True&loc=Local"
+        run: go test ./...
+
+  # ---------- 接口契约一致性 ----------
+  contract-check:
+    name: 契约一致性（api.gen.go 与 openapi.yaml 对齐）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+
+      - name: 重新生成并比对后端契约文件
+        working-directory: server
+        run: |
+          go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1 \
+            -generate types,gin -package gen -o /tmp/api.gen.check.go ../api/openapi.yaml
+          if ! diff -q /tmp/api.gen.check.go internal/gen/api.gen.go > /dev/null; then
+            echo "❌ internal/gen/api.gen.go 与 api/openapi.yaml 不一致。"
+            echo "请在 server 目录执行以下命令并提交生成文件："
+            echo "  oapi-codegen -generate types,gin -package gen -o internal/gen/api.gen.go ../api/openapi.yaml"
+            exit 1
+          fi
+          echo "✅ internal/gen/api.gen.go 与 api/openapi.yaml 一致"
+
+  # ---------- 端到端测试 ----------
+  e2e:
+    name: 端到端测试（真实 MySQL + 后端实例模拟操作）
+    runs-on: ubuntu-latest
+    needs: [unit-tests, contract-check]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: hazard_system
+          MYSQL_USER: hazard
+          MYSQL_PASSWORD: hazard_dev_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+
+      - name: 安装 curl / jq
+        run: sudo apt-get update && sudo apt-get install -y curl jq
+
+      - name: 构建后端二进制
+        working-directory: server
+        run: go build -o /tmp/hazard-server ./cmd/server
+
+      - name: 启动后端并运行端到端脚本
+        working-directory: server
+        env:
+          SERVER_PORT: "8090"
+          DB_HOST: "127.0.0.1"
+          DB_PORT: "3306"
+          DB_USER: "hazard"
+          DB_PASSWORD: "hazard_dev_password"
+          DB_NAME: "hazard_system"
+          JWT_SECRET: "e2e-test-secret-that-is-long-enough-123456"
+          ADMIN_PASSWORD: "e2e-admin-password"
+          UPLOAD_DIR: "/tmp/e2e-uploads"
+          E2E_BASE_URL: "http://127.0.0.1:8090"
+          E2E_ADMIN_PASSWORD: "e2e-admin-password"
+        run: |
+          set -euo pipefail
+          /tmp/hazard-server > /tmp/backend.log 2>&1 &
+          BACKEND_PID=$!
+          trap 'kill $BACKEND_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8090/healthz > /dev/null 2>&1; then
+              echo "后端已就绪"
+              break
+            fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8090/healthz > /dev/null || { echo "❌ 后端启动超时"; cat /tmp/backend.log; exit 1; }
+          ADMIN_PASSWORD="$E2E_ADMIN_PASSWORD" bash scripts/e2e.sh
+
+  # ---------- 镜像构建与推送 ----------
+  build-push:
+    name: 镜像构建与推送（CCR）
+    runs-on: ubuntu-latest
+    needs: [unit-tests, contract-check, e2e]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 计算镜像全名（小写）
+        id: meta
+        run: |
+          echo "TAG_LATEST=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE }}:latest" >> "$GITHUB_OUTPUT"
+          echo "TAG_SHA=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE }}:${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: 配置 Buildx（启用 GHA 缓存）
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录腾讯云镜像仓库
+        if: env.SHOULD_PUSH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.TENCENT_CCR_USERNAME }}
+          password: ${{ secrets.TENCENT_CCR_PASSWORD }}
+
+      - name: 构建并推送后端镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: ${{ env.SHOULD_PUSH == 'true' }}
+          tags: |
+            ${{ steps.meta.outputs.TAG_LATEST }}
+            ${{ steps.meta.outputs.TAG_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

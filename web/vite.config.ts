@@ -21,4 +21,15 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    host: true,
+    port: 4173,
+    proxy: {
+      // 生产预览同样代理 /api（供本地/CI 端到端验证）。
+      '/api': {
+        target: 'http://127.0.0.1:8090',
+        changeOrigin: true,
+      },
+    },
+  },
 })
