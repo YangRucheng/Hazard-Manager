@@ -1,0 +1,245 @@
+name: 前端：基础测试·契约·端到端·镜像
+
+# 前端相关改动才触发（web/ 或契约 api/ 变更时两端都要校验，故也监听 api/）。
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "web/**"
+      - "api/**"
+      - ".github/workflows/ci-frontend.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - "api/**"
+      - ".github/workflows/ci-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 腾讯云容器镜像仓库 CCR（registry 与 namespace 可用仓库变量覆盖）
+  REGISTRY: ${{ vars.TENCENT_CCR_REGISTRY || 'ccr.ccs.tencentyun.com' }}
+  IMAGE_NAMESPACE: ${{ vars.TENCENT_CCR_NAMESPACE || 'yangrucheng' }}
+  IMAGE: hazard-manager-web
+  # 仅 push 到 master 时才推送镜像；PR/其他分支只做构建测试，绝不推送
+  SHOULD_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+
+jobs:
+  # ---------- 基础测试 ----------
+  unit-tests:
+    name: 基础测试（typecheck / vitest / build）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: 配置 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: 安装依赖
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查（vue-tsc，strict / 零 any）
+        working-directory: web
+        run: pnpm typecheck
+
+      - name: 单元测试（vitest）
+        working-directory: web
+        run: pnpm test
+
+      - name: 生产构建
+        working-directory: web
+        run: pnpm build
+
+  # ---------- 接口契约一致性 ----------
+  contract-check:
+    name: 契约一致性（schema.d.ts 与 openapi.yaml 对齐）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: 配置 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: 安装依赖
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: 重新生成并比对前端契约类型
+        working-directory: web
+        run: |
+          pnpm schema
+          if ! git diff --exit-code -- src/api/schema.d.ts; then
+            echo "❌ src/api/schema.d.ts 与 api/openapi.yaml 不一致。"
+            echo "请在 web 目录执行 pnpm schema 并提交生成文件。"
+            exit 1
+          fi
+          echo "✅ src/api/schema.d.ts 与 api/openapi.yaml 一致"
+
+  # ---------- 端到端测试（前端产物 + 代理 → 后端 → MySQL 全链路） ----------
+  e2e:
+    name: 端到端测试（静态产物经代理访问真实后端）
+    runs-on: ubuntu-latest
+    needs: [unit-tests, contract-check]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: hazard_system
+          MYSQL_USER: hazard
+          MYSQL_PASSWORD: hazard_dev_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+
+      - name: 配置 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: 配置 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: 安装 curl / jq
+        run: sudo apt-get update && sudo apt-get install -y curl jq
+
+      - name: 构建后端二进制
+        working-directory: server
+        run: go build -o /tmp/hazard-server ./cmd/server
+
+      - name: 构建前端产物
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: 启动后端与前端预览，走查全链路
+        working-directory: web
+        env:
+          SERVER_PORT: "8090"
+          DB_HOST: "127.0.0.1"
+          DB_PORT: "3306"
+          DB_USER: "hazard"
+          DB_PASSWORD: "hazard_dev_password"
+          DB_NAME: "hazard_system"
+          JWT_SECRET: "e2e-test-secret-that-is-long-enough-123456"
+          ADMIN_PASSWORD: "e2e-admin-password"
+          UPLOAD_DIR: "/tmp/e2e-uploads"
+        run: |
+          set -euo pipefail
+          /tmp/hazard-server > /tmp/backend.log 2>&1 &
+          BACKEND_PID=$!
+          pnpm preview --port 4173 > /tmp/preview.log 2>&1 &
+          PREVIEW_PID=$!
+          cleanup() { kill $BACKEND_PID $PREVIEW_PID 2>/dev/null || true; }
+          trap cleanup EXIT
+
+          # 等待后端与前端就绪
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8090/healthz > /dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8090/healthz > /dev/null || { echo "❌ 后端启动超时"; cat /tmp/backend.log; exit 1; }
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4173/ > /dev/null 2>&1 && break
+            sleep 1
+          done
+
+          echo "== 页面加载 =="
+          HTML="$(curl -sf http://127.0.0.1:4173/)"
+          echo "$HTML" | grep -q 'id="app"' || { echo "❌ 首页缺少挂载点 #app"; exit 1; }
+          echo "  ✔ 首页返回且含挂载点"
+
+          echo "== 静态资源 =="
+          JS="$(echo "$HTML" | grep -oE '/assets/[^"]+\.js' | head -1)"
+          curl -sf -o /dev/null "http://127.0.0.1:4173$JS" && echo "  ✔ JS 资源可加载（$JS）"
+
+          echo "== 经前端代理访问后端 =="
+          LOGIN="$(curl -sf -X POST http://127.0.0.1:4173/api/v1/auth/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"e2e-admin-password"}')"
+          TOKEN="$(echo "$LOGIN" | jq -r '.token')"
+          [[ -n "$TOKEN" && "$TOKEN" != "null" ]] || { echo "❌ 经代理登录失败"; exit 1; }
+          echo "  ✔ 经 /api 代理登录成功"
+          CODE="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4173/api/v1/hazards -H "Authorization: Bearer $TOKEN")"
+          [[ "$CODE" == "200" ]] || { echo "❌ 经代理获取隐患列表失败 HTTP $CODE"; exit 1; }
+          echo "  ✔ 经 /api 代理获取隐患列表成功"
+
+          echo "✅ 前端端到端全链路通过"
+
+  # ---------- 镜像构建与推送 ----------
+  build-push:
+    name: 镜像构建与推送（CCR）
+    runs-on: ubuntu-latest
+    needs: [unit-tests, contract-check, e2e]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 计算镜像全名（小写）
+        id: meta
+        run: |
+          echo "TAG_LATEST=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE }}:latest" >> "$GITHUB_OUTPUT"
+          echo "TAG_SHA=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE }}:${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: 登录腾讯云镜像仓库
+        if: env.SHOULD_PUSH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.TENCENT_CCR_USERNAME }}
+          password: ${{ secrets.TENCENT_CCR_PASSWORD }}
+
+      - name: 构建并推送前端镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: ./web
+          file: ./web/Dockerfile
+          push: ${{ env.SHOULD_PUSH == 'true' }}
+          tags: |
+            ${{ steps.meta.outputs.TAG_LATEST }}
+            ${{ steps.meta.outputs.TAG_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
