@@ -52,7 +52,7 @@ func main() {
 
 	srv := handler.NewServer(hazardSvc, unitSvc, typeSvc, am, store, cfg.MaxUploadBytes)
 
-	engine := router.NewRouter(srv, am, cfg)
+	engine := router.NewRouter(srv, am)
 
 	log.Printf("隐患闭环系统服务启动，监听 :%s", cfg.ServerPort)
 	if err := engine.Run(":" + cfg.ServerPort); err != nil {

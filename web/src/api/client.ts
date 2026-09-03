@@ -3,10 +3,10 @@ import createClient from 'openapi-fetch'
 
 import { useAuth } from '@/stores/auth'
 
+import { API_BASE } from './config'
 import type { paths } from './schema'
 
-/** 后端代理前缀（开发经 Vite proxy 转发）。 */
-export const API_BASE = '/api'
+export { API_BASE }
 
 export const client = createClient<paths>({
   baseUrl: API_BASE,
@@ -46,12 +46,12 @@ export function errorMessage(err: unknown): string {
   return '请求失败，请稍后重试'
 }
 
-/** 由图片 uuid 拼原图 URL（相对路径，经代理访问）。 */
+/** 由图片 uuid 拼原图 URL（base 已含 /api/v1）。 */
 export function imageUrl(id: string): string {
-  return `${API_BASE}/v1/images/${id}`
+  return `${API_BASE}/images/${id}`
 }
 
 /** 由图片 uuid 拼缩略图 URL（列表预览用）。 */
 export function thumbnailUrl(id: string): string {
-  return `${API_BASE}/v1/images/${id}/thumbnail`
+  return `${API_BASE}/images/${id}/thumbnail`
 }
