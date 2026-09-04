@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, ref, watch, type Component } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   NLayout,
@@ -8,19 +8,14 @@ import {
   NLayoutContent,
   NIcon,
   NButton,
+  NBreadcrumb,
+  NBreadcrumbItem,
   NDrawer,
   NDrawerContent,
   NDropdown,
-  NAvatar,
   useDialog,
 } from 'naive-ui'
-import {
-  LogOutOutline,
-  PersonCircleOutline,
-  MenuOutline,
-  ChevronBackOutline,
-  ChevronForwardOutline,
-} from '@vicons/ionicons5'
+import { MenuOutline } from '@vicons/ionicons5'
 
 import { useAuth } from '@/stores/auth'
 import { useIsMobile } from '@/utils/media'
@@ -37,18 +32,7 @@ const collapsed = ref(false)
 /** 移动端抽屉式侧栏开关。 */
 const drawerOpen = ref(false)
 
-function renderIcon(icon: Component) {
-  return () => h(NIcon, null, { default: () => h(icon) })
-}
-
 const pageTitle = computed<string>(() => String(route.meta.title ?? ''))
-
-function handleMenuSelect(key: string): void {
-  drawerOpen.value = false
-  if (key !== route.path) {
-    void router.push(key)
-  }
-}
 
 // 视口从移动端切回桌面端时，收起抽屉。
 watch(isMobile, (mobile) => {
@@ -57,9 +41,21 @@ watch(isMobile, (mobile) => {
   }
 })
 
+/** 内容区留白：对齐参考系统（桌面 24/28/32，移动端收紧）。 */
+const contentStyle = computed<string>(() =>
+  isMobile.value ? 'padding: 14px 12px 24px;' : 'padding: 24px 28px 32px;',
+)
+
+function handleMenuSelect(key: string): void {
+  drawerOpen.value = false
+  if (key !== route.path) {
+    void router.push(key)
+  }
+}
+
 function toggleSider(): void {
   if (isMobile.value) {
-    drawerOpen.value = !drawerOpen.value
+    drawerOpen.value = true
   } else {
     collapsed.value = !collapsed.value
   }
@@ -80,56 +76,66 @@ function handleLogout(): void {
 </script>
 
 <template>
-  <n-layout class="main-layout" has-sider position="absolute">
+  <n-layout has-sider class="app-shell">
     <n-layout-sider
       v-if="!isMobile"
       bordered
-      :width="220"
-      :collapsed-width="64"
-      :native-scrollbar="false"
       collapse-mode="width"
-      show-trigger="bar"
+      :collapsed-width="64"
+      :width="220"
       :collapsed="collapsed"
-      @update:collapsed="(v: boolean) => (collapsed = v)"
+      show-trigger
+      @collapse="collapsed = true"
+      @expand="collapsed = false"
     >
       <SiderContent :collapsed="collapsed" @select="handleMenuSelect" />
     </n-layout-sider>
 
-    <n-layout>
+    <n-layout class="app-main">
       <n-layout-header bordered class="topbar">
         <div class="topbar-left">
-          <n-button quaternary circle class="topbar-toggle" @click="toggleSider">
+          <n-button
+            v-if="isMobile"
+            quaternary
+            circle
+            class="topbar-toggle"
+            aria-label="打开导航菜单"
+            @click="toggleSider"
+          >
             <template #icon>
-              <n-icon>
-                <menu-outline v-if="isMobile" />
-                <chevron-back-outline v-else-if="collapsed" />
-                <chevron-forward-outline v-else />
-              </n-icon>
+              <n-icon><menu-outline /></n-icon>
             </template>
           </n-button>
-          <div class="topbar-title">{{ pageTitle }}</div>
+          <n-breadcrumb v-if="!isMobile">
+            <n-breadcrumb-item>隐患闭环</n-breadcrumb-item>
+            <n-breadcrumb-item v-if="pageTitle">{{ pageTitle }}</n-breadcrumb-item>
+          </n-breadcrumb>
+          <div v-if="isMobile && pageTitle" class="topbar-title">{{ pageTitle }}</div>
         </div>
+
         <n-dropdown
           trigger="click"
           placement="bottom-end"
-          :options="[{ label: '退出登录', key: 'logout', icon: renderIcon(LogOutOutline) }]"
+          :options="[{ label: '退出登录', key: 'logout' }]"
           @select="handleLogout"
         >
-          <div class="user-entry">
-            <n-avatar :size="30" round :style="{ background: '#1668dc' }">
-              <n-icon><person-circle-outline /></n-icon>
-            </n-avatar>
+          <button type="button" class="user-menu-trigger" aria-label="打开用户菜单">
             <span class="user-name">{{ username ?? 'admin' }}</span>
-          </div>
+            <span class="user-menu-caret" aria-hidden="true" />
+          </button>
         </n-dropdown>
       </n-layout-header>
 
-      <n-layout-content class="content" :native-scrollbar="false">
+      <n-layout-content
+        class="app-content"
+        :content-style="contentStyle"
+        :native-scrollbar="false"
+      >
         <router-view />
       </n-layout-content>
     </n-layout>
 
-    <n-drawer v-model:show="drawerOpen" :width="260" placement="left">
+    <n-drawer v-model:show="drawerOpen" :width="240" placement="left">
       <n-drawer-content :body-content-style="{ padding: '0' }" closable>
         <SiderContent @select="handleMenuSelect" />
       </n-drawer-content>
@@ -138,68 +144,99 @@ function handleLogout(): void {
 </template>
 
 <style scoped>
-.main-layout {
+.app-shell {
   height: 100vh;
+  background: var(--color-bg);
+}
+
+.app-main {
+  background: var(--color-bg);
 }
 
 .topbar {
+  height: 68px;
+  padding: 0 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 56px;
-  padding: 0 12px 0 8px;
+  gap: 16px;
+  background: rgb(255 255 255 / 92%);
+  backdrop-filter: blur(12px);
 }
 
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
   min-width: 0;
 }
 
 .topbar-title {
   font-size: 16px;
   font-weight: 600;
-  color: #17233d;
+  color: var(--color-text-strong);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.user-entry {
+.user-menu-trigger {
+  min-height: 40px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  padding: 4px 13px 4px 15px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: inherit;
+  background: transparent;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: background 0.2s;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.user-entry:hover {
-  background: rgba(22, 104, 220, 0.08);
+.user-menu-trigger:hover,
+.user-menu-trigger:focus-visible {
+  border-color: #dce5ff;
+  background: var(--color-primary-soft);
+  outline: none;
 }
 
 .user-name {
+  color: var(--color-text-strong);
   font-size: 14px;
-  color: #1f2937;
+  font-weight: 600;
+  line-height: 1.25;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.content {
-  padding: 12px;
+.user-menu-caret {
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  flex: none;
+  border-right: 1.5px solid var(--color-text-muted);
+  border-bottom: 1.5px solid var(--color-text-muted);
+  transform: rotate(45deg);
+}
+
+.app-content {
+  background:
+    radial-gradient(circle at 100% 0%, rgb(63 99 216 / 4%), transparent 28%), var(--color-bg);
 }
 
 @media (max-width: 820px) {
   .topbar {
-    padding: 0 8px;
+    height: 56px;
+    padding: 0 12px;
   }
 
-  .user-name {
-    display: none;
-  }
-
-  .content {
-    padding: 0;
+  .app-content {
+    background: var(--color-bg);
   }
 }
 </style>

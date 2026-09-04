@@ -2,6 +2,7 @@
 import { h, onMounted, ref } from 'vue'
 import {
   NButton,
+  NCard,
   NDataTable,
   NPagination,
   NSwitch,
@@ -128,23 +129,23 @@ const columns: DataTableColumns<ImageSummary> = [
   {
     title: '预览',
     key: 'thumbnail',
-    width: 92,
+    width: 96,
     render: (row) =>
       h(AuthImage, {
         url: thumbnailUrl(row.id),
         previewUrl: imageUrl(row.id),
         width: 64,
         height: 64,
-        style: 'border-radius:4px;border:1px solid #dbe5f1;overflow:hidden',
+        style: 'border-radius:6px;border:1px solid #e2e7ef;overflow:hidden',
       }),
   },
-  { title: 'UUID', key: 'id', minWidth: 220, ellipsis: { tooltip: true } },
-  { title: '格式', key: 'mimeType', width: 110 },
-  { title: '大小', key: 'sizeBytes', width: 100, render: (row) => formatBytes(row.sizeBytes) },
+  { title: 'UUID', key: 'id', minWidth: 240, ellipsis: { tooltip: true } },
+  { title: '格式', key: 'mimeType', width: 120 },
+  { title: '大小', key: 'sizeBytes', width: 110, render: (row) => formatBytes(row.sizeBytes) },
   {
     title: '尺寸',
     key: 'dimension',
-    width: 110,
+    width: 120,
     render: (row) => (row.width && row.height ? `${row.width}×${row.height}` : '—'),
   },
   {
@@ -161,13 +162,13 @@ const columns: DataTableColumns<ImageSummary> = [
   {
     title: '上传时间',
     key: 'createdAt',
-    width: 150,
+    width: 160,
     render: (row) => formatDateTime(row.createdAt),
   },
   {
     title: '操作',
     key: 'actions',
-    width: 150,
+    width: 160,
     fixed: 'right',
     render: (row) =>
       h('div', { style: 'display:flex;gap:8px' }, [
@@ -193,60 +194,59 @@ onMounted(loadList)
 </script>
 
 <template>
-  <div>
-    <div class="page-toolbar">
-      <div class="filter-inline">
-        <n-switch v-model:value="onlyUnused" @update:value="handleFilterChange" />
-        <span class="filter-label">仅看未引用</span>
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">附件管理</h1>
       </div>
-      <div class="spacer" />
       <n-button :loading="loading" @click="loadList">刷新</n-button>
     </div>
 
-    <n-data-table
-      :columns="columns"
-      :data="items"
-      :loading="loading"
-      :bordered="false"
-      :row-key="(row: ImageSummary) => row.id"
-      :scroll-x="960"
-      size="small"
-    />
-    <div class="pager">
-      <n-pagination
-        :page="page"
-        :page-size="pageSize"
-        :item-count="total"
-        :simple="isMobile"
-        @update:page="handlePageChange"
+    <n-card class="filter-card">
+      <div class="filter-heading">
+        <span class="filter-title">附件范围</span>
+      </div>
+      <div class="filter-toggle">
+        <n-switch v-model:value="onlyUnused" @update:value="handleFilterChange" />
+        <span>仅看未被隐患引用的附件</span>
+      </div>
+    </n-card>
+
+    <n-card class="data-card">
+      <n-data-table
+        :columns="columns"
+        :data="items"
+        :loading="loading"
+        :bordered="false"
+        :row-key="(row: ImageSummary) => row.id"
+        :scroll-x="1100"
+        size="small"
       />
-      <span class="pager-total">共 {{ total }} 条</span>
-    </div>
+      <div class="pagination-bar">
+        <span class="muted pager-total">共 {{ total }} 条</span>
+        <n-pagination
+          :page="page"
+          :page-size="pageSize"
+          :item-count="total"
+          :simple="isMobile"
+          @update:page="handlePageChange"
+        />
+      </div>
+    </n-card>
   </div>
 </template>
 
 <style scoped>
-.filter-inline {
+.filter-toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.filter-label {
+  gap: 10px;
+  color: var(--color-text);
   font-size: 14px;
-  color: #1f2937;
-}
-
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 14px;
 }
 
 .pager-total {
+  margin-right: auto;
   font-size: 13px;
-  color: #1f2937;
 }
 </style>

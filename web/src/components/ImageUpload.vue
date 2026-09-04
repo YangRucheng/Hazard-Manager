@@ -101,7 +101,7 @@ function handleBeforeUpload(data: { file: UploadFileInfo }): boolean {
     >
       <n-upload-dragger class="upload-dragger">
         <div class="upload-inner">
-          <n-icon size="28" color="#1668dc"><cloud-upload-outline /></n-icon>
+          <n-icon size="28" color="var(--color-primary)"><cloud-upload-outline /></n-icon>
           <span>{{ placeholder }}</span>
         </div>
       </n-upload-dragger>
@@ -121,7 +121,7 @@ function handleBeforeUpload(data: { file: UploadFileInfo }): boolean {
   position: relative;
   border-radius: 6px;
   overflow: hidden;
-  border: 1px solid #dbe5f1;
+  border: 1px solid var(--color-border);
 }
 
 .remove-btn {
@@ -143,6 +143,6 @@ function handleBeforeUpload(data: { file: UploadFileInfo }): boolean {
   align-items: center;
   gap: 6px;
   padding: 8px 0;
-  color: #17233d;
+  color: var(--color-text-strong);
 }
 </style>

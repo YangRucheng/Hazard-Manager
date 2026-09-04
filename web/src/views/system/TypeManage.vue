@@ -2,6 +2,7 @@
 import { computed, h, onMounted, ref } from 'vue'
 import {
   NButton,
+  NCard,
   NDataTable,
   NForm,
   NFormItem,
@@ -88,6 +89,11 @@ function openEdit(row: HazardType): void {
   showModal.value = true
 }
 
+/** 整行可点击打开编辑弹窗（操作列的编辑按钮已移除）。 */
+function rowProps(row: HazardType) {
+  return { onClick: () => openEdit(row) }
+}
+
 async function handleSave(): Promise<void> {
   try {
     await formRef.value?.validate()
@@ -149,62 +155,62 @@ function confirmDelete(): void {
 }
 
 const columns: DataTableColumns<HazardType> = [
-  { title: 'ID', key: 'id', width: 70 },
+  { title: 'ID', key: 'id', width: 80 },
   {
     title: '大类',
     key: 'major',
-    minWidth: 180,
+    minWidth: 200,
     render: (row) =>
       h('span', { style: 'display:inline-flex;align-items:center;gap:8px' }, [
         h(NTag, { size: 'small', type: 'info', bordered: false }, { default: () => row.major }),
       ]),
   },
-  { title: '小类', key: 'minor', minWidth: 200 },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 110,
-    render: (row) =>
-      h('div', { style: 'display:flex;gap:8px' }, [
-        h(NButton, { size: 'small', onClick: () => openEdit(row) }, { default: () => '编辑' }),
-      ]),
-  },
+  { title: '小类', key: 'minor', minWidth: 220 },
 ]
 
 onMounted(loadList)
 </script>
 
 <template>
-  <div>
-    <div class="page-toolbar">
-      <div class="spacer" />
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">隐患类型</h1>
+      </div>
       <n-button type="primary" @click="openCreate">新增隐患类型</n-button>
     </div>
-    <n-data-table
-      :columns="columns"
-      :data="list"
-      :loading="loading"
-      :bordered="false"
-      :scroll-x="640"
-      size="small"
-      :row-key="(row: HazardType) => row.id"
-    />
+
+    <n-card class="data-card">
+      <n-data-table
+        class="row-clickable"
+        :columns="columns"
+        :data="list"
+        :loading="loading"
+        :bordered="false"
+        :scroll-x="760"
+        size="small"
+        :row-key="(row: HazardType) => row.id"
+        :row-props="rowProps"
+      />
+    </n-card>
 
     <n-modal
       v-model:show="showModal"
       preset="card"
       draggable
       :title="editingId === null ? '新增隐患类型' : '编辑隐患类型'"
-      style="width: 520px; max-width: 94vw"
+      style="width: min(520px, calc(100vw - 32px))"
       :mask-closable="false"
     >
-      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="72">
+      <n-form ref="formRef" :model="form" :rules="rules" label-placement="top">
         <n-form-item label="大类" path="major">
           <n-auto-complete
             v-model:value="form.major"
             :options="majorOptions"
             placeholder="可下拉选择已有大类，也可直接输入新大类"
             clearable
+            show-empty
+            :get-show="() => true"
           />
         </n-form-item>
         <n-form-item label="小类" path="minor">
@@ -229,6 +235,14 @@ onMounted(loadList)
 </template>
 
 <style scoped>
+.row-clickable :deep(.n-data-table-tr) {
+  cursor: pointer;
+}
+
+.row-clickable :deep(.n-data-table-tr:hover) {
+  background: rgba(63, 99, 216, 0.05);
+}
+
 .modal-footer {
   display: flex;
   align-items: center;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NForm, NFormItem, NInput, NButton, useMessage, type FormInst, type FormRules } from 'naive-ui'
+import { NCard, NForm, NFormItem, NInput, NButton, useMessage, type FormInst, type FormRules } from 'naive-ui'
 
 import { client, errorMessage } from '@/api/client'
 import { useAuth } from '@/stores/auth'
@@ -51,91 +51,148 @@ async function handleSubmit(): Promise<void> {
 </script>
 
 <template>
-  <div class="login-page">
-    <div class="login-card">
-      <div class="login-head">
+  <main class="login-page">
+    <section class="login-intro">
+      <div class="intro-content">
         <img class="login-logo" src="/logo.png" alt="电气车间隐患闭环系统" />
-        <h1 class="login-title">电气车间隐患闭环系统</h1>
-        <p class="login-sub">Hazard Closed-Loop Management</p>
+        <span class="eyebrow">ELECTRICAL WORKSHOP</span>
+        <h1>电气车间<br />隐患闭环管理</h1>
       </div>
-      <n-form ref="formRef" :model="form" :rules="rules" size="large" @keyup.enter="handleSubmit">
-        <n-form-item label="账号" path="username">
-          <n-input v-model:value="form.username" placeholder="请输入账号" />
-        </n-form-item>
-        <n-form-item label="密码" path="password">
-          <n-input
-            v-model:value="form.password"
-            type="password"
-            show-password-on="mousedown"
-            placeholder="请输入密码"
-          />
-        </n-form-item>
-        <n-button class="login-btn" type="primary" block :loading="loading" @click="handleSubmit">
-          登 录
-        </n-button>
-      </n-form>
-    </div>
-  </div>
+    </section>
+    <section class="login-panel">
+      <n-card class="login-card" :bordered="false">
+        <h2>欢迎登录</h2>
+        <n-form ref="formRef" :model="form" :rules="rules" size="large" @submit.prevent="handleSubmit">
+          <n-form-item label="账号" path="username">
+            <n-input v-model:value="form.username" placeholder="请输入账号" />
+          </n-form-item>
+          <n-form-item label="密码" path="password">
+            <n-input
+              v-model:value="form.password"
+              type="password"
+              show-password-on="click"
+              placeholder="请输入密码"
+              @keyup.enter="handleSubmit"
+            />
+          </n-form-item>
+          <n-button type="primary" block size="large" :loading="loading" @click="handleSubmit">
+            登录
+          </n-button>
+        </n-form>
+      </n-card>
+    </section>
+  </main>
 </template>
 
 <style scoped>
 .login-page {
   min-height: 100vh;
   min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px 0;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  background: var(--color-bg);
+}
+
+.login-intro {
   background:
-    radial-gradient(1200px 500px at 20% -10%, rgba(64, 152, 252, 0.35), transparent 60%),
-    radial-gradient(1000px 500px at 90% 110%, rgba(22, 104, 220, 0.3), transparent 55%),
-    #eef4fb;
+    radial-gradient(circle at 18% 20%, rgb(255 255 255 / 14%), transparent 24%),
+    linear-gradient(145deg, #2947a6, #5579e7);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
 }
 
-.login-card {
-  width: min(380px, calc(100vw - 32px));
-  padding: 40px 36px 32px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(22, 104, 220, 0.12);
-  border: 1px solid #dbe5f1;
+.login-intro::after {
+  content: '';
+  position: absolute;
+  width: 480px;
+  height: 480px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 50%;
+  right: -120px;
+  bottom: -160px;
+  box-shadow:
+    0 0 0 80px rgb(255 255 255 / 4%),
+    0 0 0 160px rgb(255 255 255 / 3%);
 }
 
-@media (max-width: 820px) {
-  .login-card {
-    padding: 28px 20px 24px;
-  }
+.intro-content {
+  z-index: 1;
+  max-width: 500px;
+  padding: 48px;
 }
 
-.login-head {
-  text-align: center;
-  margin-bottom: 28px;
+.eyebrow {
+  letter-spacing: 3px;
+  opacity: 0.75;
 }
 
 .login-logo {
-  width: 52px;
-  height: 52px;
   display: block;
-  margin: 0 auto 12px;
+  width: 88px;
+  height: 88px;
+  margin-bottom: 24px;
   object-fit: contain;
 }
 
-.login-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #17233d;
+h1 {
+  font-size: 48px;
+  line-height: 1.25;
+  margin: 20px 0 0;
 }
 
-.login-sub {
-  margin: 8px 0 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: #4b8bf0;
-  letter-spacing: 0.6px;
+.login-panel {
+  display: grid;
+  place-items: center;
+  padding: 48px;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(63 99 216 / 7%), transparent 32%), var(--color-bg);
 }
 
-.login-btn {
-  margin-top: 8px;
+.login-card {
+  width: 420px;
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: 0 18px 44px rgb(15 23 42 / 10%);
+}
+
+.login-card h2 {
+  font-size: 28px;
+  margin: 0 0 22px;
+  color: var(--color-text-strong);
+}
+
+@media (max-width: 900px) {
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .login-intro {
+    min-height: 220px;
+  }
+
+  h1 {
+    font-size: 32px;
+  }
+
+  .intro-content {
+    padding: 24px;
+    text-align: center;
+  }
+
+  .login-logo {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+  }
+
+  .login-panel {
+    padding: 24px 16px;
+  }
+
+  .login-card {
+    width: min(420px, 100%);
+  }
 }
 </style>

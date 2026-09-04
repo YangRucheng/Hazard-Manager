@@ -273,17 +273,24 @@ onMounted(() => {
 
 <template>
   <div class="page">
-    <n-card :bordered="true" :title="isEdit ? '编辑隐患' : '新增隐患'">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">{{ isEdit ? '编辑隐患' : '新增隐患' }}</h1>
+      </div>
+      <n-button @click="handleCancel">返回列表</n-button>
+    </div>
+
+    <n-card>
       <n-form
         ref="formRef"
         :model="form"
         :rules="rules"
         :label-placement="isMobile ? 'top' : 'left'"
-        :label-width="isMobile ? undefined : 110"
+        :label-width="isMobile ? undefined : 100"
         :disabled="loading"
-        style="max-width: 1080px"
+        style="max-width: 1120px"
       >
-        <n-grid :cols="isMobile ? 1 : 2" :x-gap="24">
+        <n-grid :cols="isMobile ? 1 : 2" :x-gap="28">
           <n-grid-item>
             <n-form-item label="检查区域" path="inspectionArea">
               <n-input v-model:value="form.inspectionArea" placeholder="默认：华星现场" />
@@ -403,8 +410,8 @@ onMounted(() => {
         </n-grid>
 
         <div class="form-actions">
-          <n-button type="primary" :loading="saving" @click="handleSubmit">保存</n-button>
           <n-button @click="handleCancel">取消</n-button>
+          <n-button type="primary" :loading="saving" @click="handleSubmit">保存</n-button>
         </div>
       </n-form>
     </n-card>
@@ -418,6 +425,6 @@ onMounted(() => {
   gap: 10px;
   margin-top: 8px;
   padding-top: 16px;
-  border-top: 1px solid #eef3fa;
+  border-top: 1px solid var(--color-border-subtle);
 }
 </style>
