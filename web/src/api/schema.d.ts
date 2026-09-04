@@ -401,8 +401,6 @@ export interface components {
             /** @description 责任人（一一对应） */
             person: string;
             remark?: string | null;
-            /** @description 排序（小在前） */
-            sort: number;
             /**
              * @description 0=停用 1=启用
              * @enum {integer}
@@ -417,8 +415,6 @@ export interface components {
             name: string;
             person: string;
             remark?: string | null;
-            /** @default 0 */
-            sort: number;
             /**
              * @default 1
              * @enum {integer}
@@ -429,7 +425,6 @@ export interface components {
             name?: string;
             person?: string;
             remark?: string | null;
-            sort?: number;
             /** @enum {integer} */
             status?: 0 | 1;
         };

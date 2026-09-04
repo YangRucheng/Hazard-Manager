@@ -27,6 +27,11 @@ func Connect(dsn string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("迁移旧版隐患类型结构失败: %w", err)
 	}
 
+	// 责任单位去掉排序功能：删除遗留 sort 列（幂等，列不存在则跳过）。
+	if err := migrateUnitDropSort(db); err != nil {
+		return nil, fmt.Errorf("迁移责任单位排序列失败: %w", err)
+	}
+
 	// 建表顺序：枚举表先于主表。
 	if err := db.AutoMigrate(
 		&model.ResponsibleUnit{},
@@ -104,4 +109,24 @@ func migrateLegacyHazardSchema(db *gorm.DB) error {
 		log.Printf("旧版隐患类型结构迁移完成")
 		return nil
 	})
+}
+
+// migrateUnitDropSort 责任单位去排序功能：删除 responsible_units.sort 遗留列。
+// 经 information_schema 探测，列存在才执行，幂等。
+func migrateUnitDropSort(db *gorm.DB) error {
+	var has int64
+	err := db.Raw(`SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'responsible_units' AND column_name = 'sort'`).
+		Scan(&has).Error
+	if err != nil {
+		return err
+	}
+	if has == 0 {
+		return nil
+	}
+	if err := db.Exec("ALTER TABLE responsible_units DROP COLUMN sort").Error; err != nil {
+		return err
+	}
+	log.Printf("已删除责任单位遗留排序列 sort（列表改为按创建顺序返回）")
+	return nil
 }

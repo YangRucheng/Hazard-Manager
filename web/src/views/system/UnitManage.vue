@@ -6,7 +6,6 @@ import {
   NForm,
   NFormItem,
   NInput,
-  NInputNumber,
   NModal,
   NSwitch,
   useDialog,
@@ -26,7 +25,6 @@ interface UnitFormModel {
   name: string
   person: string
   remark: string
-  sort: number
   status: 0 | 1
 }
 
@@ -40,7 +38,7 @@ const showModal = ref(false)
 const editingId = ref<number | null>(null)
 const saving = ref(false)
 const formRef = ref<FormInst | null>(null)
-const form = ref<UnitFormModel>({ name: '', person: '', remark: '', sort: 0, status: 1 })
+const form = ref<UnitFormModel>({ name: '', person: '', remark: '', status: 1 })
 
 const rules: FormRules = {
   name: { required: true, message: '请输入单位名称', trigger: ['input', 'blur'] },
@@ -63,7 +61,7 @@ async function loadList(): Promise<void> {
 
 function openCreate(): void {
   editingId.value = null
-  form.value = { name: '', person: '', remark: '', sort: items.value.length, status: 1 }
+  form.value = { name: '', person: '', remark: '', status: 1 }
   showModal.value = true
 }
 
@@ -73,7 +71,6 @@ function openEdit(row: ResponsibleUnit): void {
     name: row.name,
     person: row.person,
     remark: row.remark ?? '',
-    sort: row.sort,
     status: row.status,
   }
   showModal.value = true
@@ -93,7 +90,6 @@ async function handleSave(): Promise<void> {
           name: form.value.name.trim(),
           person: form.value.person.trim(),
           remark: form.value.remark.trim() || null,
-          sort: form.value.sort,
           status: form.value.status,
         },
       })
@@ -109,7 +105,6 @@ async function handleSave(): Promise<void> {
           name: form.value.name.trim(),
           person: form.value.person.trim(),
           remark: form.value.remark.trim() || null,
-          sort: form.value.sort,
           status: form.value.status,
         },
       })
@@ -170,7 +165,6 @@ const columns: DataTableColumns<ResponsibleUnit> = [
   { title: '单位名称', key: 'name', minWidth: 160 },
   { title: '责任人', key: 'person', width: 110 },
   { title: '备注', key: 'remark', ellipsis: { tooltip: true }, minWidth: 160 },
-  { title: '排序', key: 'sort', width: 80 },
   {
     title: '状态',
     key: 'status',
@@ -229,9 +223,6 @@ onMounted(loadList)
         </n-form-item>
         <n-form-item label="备注">
           <n-input v-model:value="form.remark" placeholder="可选" />
-        </n-form-item>
-        <n-form-item label="排序">
-          <n-input-number v-model:value="form.sort" :min="0" style="width: 100%" />
         </n-form-item>
         <n-form-item label="启用">
           <n-switch v-model:value="form.status" :checked-value="1" :unchecked-value="0" />

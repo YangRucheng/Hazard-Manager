@@ -15,7 +15,7 @@ type UnitRepo struct{ db *gorm.DB }
 // NewUnitRepo 构造 UnitRepo。
 func NewUnitRepo(db *gorm.DB) *UnitRepo { return &UnitRepo{db: db} }
 
-// List 单位列表（含停用项），可按关键词筛选，按 sort、id 排序。
+// List 单位列表（含停用项），可按关键词筛选，按创建顺序（id）返回。
 func (r *UnitRepo) List(keyword *string) ([]model.ResponsibleUnit, error) {
 	q := r.db.Model(&model.ResponsibleUnit{})
 	if keyword != nil && *keyword != "" {
@@ -23,7 +23,7 @@ func (r *UnitRepo) List(keyword *string) ([]model.ResponsibleUnit, error) {
 		q = q.Where("name LIKE ? OR person LIKE ?", kw, kw)
 	}
 	items := make([]model.ResponsibleUnit, 0)
-	err := q.Order("sort ASC, id ASC").Find(&items).Error
+	err := q.Order("id ASC").Find(&items).Error
 	if err != nil {
 		return nil, fmt.Errorf("查询单位列表失败: %w", err)
 	}

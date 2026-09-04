@@ -16,9 +16,9 @@ func SeedIfEmpty(db *gorm.DB) error {
 	}
 	if unitCount == 0 {
 		units := []model.ResponsibleUnit{
-			{Name: "电气车间", Person: "张三", Sort: 1, Status: 1},
-			{Name: "动力车间", Person: "李四", Sort: 2, Status: 1},
-			{Name: "自动化班组", Person: "王五", Sort: 3, Status: 1},
+			{Name: "电气车间", Person: "张三", Status: 1},
+			{Name: "动力车间", Person: "李四", Status: 1},
+			{Name: "自动化班组", Person: "王五", Status: 1},
 		}
 		if err := db.Create(&units).Error; err != nil {
 			return err
