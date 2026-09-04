@@ -161,7 +161,6 @@ function confirmDelete(): void {
 }
 
 const columns: DataTableColumns<ResponsibleUnit> = [
-  { title: 'ID', key: 'id', width: 70 },
   { title: '单位名称', key: 'name', minWidth: 160 },
   { title: '责任人', key: 'person', width: 110 },
   { title: '备注', key: 'remark', ellipsis: { tooltip: true }, minWidth: 160 },
@@ -201,7 +200,7 @@ onMounted(loadList)
       :data="items"
       :loading="loading"
       :bordered="false"
-      :scroll-x="760"
+      :scroll-x="640"
       size="small"
       :row-key="(row: ResponsibleUnit) => row.id"
     />
