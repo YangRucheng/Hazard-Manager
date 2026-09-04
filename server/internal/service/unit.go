@@ -44,11 +44,7 @@ func (s *UnitService) Create(req gen.UnitCreateRequest) (*gen.ResponsibleUnit, *
 		Name:   strings.TrimSpace(req.Name),
 		Person: strings.TrimSpace(req.Person),
 		Remark: req.Remark,
-		Sort:   0,
 		Status: 1,
-	}
-	if req.Sort != nil {
-		u.Sort = *req.Sort
 	}
 	if req.Status != nil {
 		u.Status = int(*req.Status)
@@ -87,9 +83,6 @@ func (s *UnitService) Update(id int64, req gen.UnitUpdateRequest) (*gen.Responsi
 	if req.Remark != nil {
 		u.Remark = req.Remark
 	}
-	if req.Sort != nil {
-		u.Sort = *req.Sort
-	}
 	if req.Status != nil {
 		u.Status = int(*req.Status)
 	}
@@ -126,7 +119,6 @@ func toGenUnit(u *model.ResponsibleUnit) gen.ResponsibleUnit {
 		Name:      u.Name,
 		Person:    u.Person,
 		Remark:    u.Remark,
-		Sort:      u.Sort,
 		Status:    gen.ResponsibleUnitStatus(u.Status),
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,

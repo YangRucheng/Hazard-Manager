@@ -236,13 +236,12 @@ func JoinImages(ids []string) (string, error) {
 	return string(b), nil
 }
 
-// ResponsibleUnit 责任单位枚举表。
+// ResponsibleUnit 责任单位枚举表。无排序字段，列表按创建顺序（id）返回。
 type ResponsibleUnit struct {
 	ID        uint64         `gorm:"primaryKey" json:"id"`
 	Name      string         `gorm:"type:varchar(128);not null;uniqueIndex" json:"name"`
 	Person    string         `gorm:"type:varchar(64);not null" json:"person"`
 	Remark    *string        `gorm:"type:varchar(255)" json:"remark"`
-	Sort      int            `gorm:"not null;default:0" json:"sort"`
 	Status    int            `gorm:"not null;default:1" json:"status"` // 0=停用 1=启用
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"updatedAt"`

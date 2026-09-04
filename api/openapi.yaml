@@ -701,13 +701,12 @@ components:
         overdue: { type: integer, description: 逾期未整改数（dueDate 早于今天且状态非已整改） }
     ResponsibleUnit:
       type: object
-      required: [id, name, person, sort, status, createdAt, updatedAt]
+      required: [id, name, person, status, createdAt, updatedAt]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string, description: 责任单位名称 }
         person: { type: string, description: 责任人（一一对应） }
         remark: { type: string, nullable: true }
-        sort: { type: integer, description: 排序（小在前） }
         status: { type: integer, enum: [0, 1], description: 0=停用 1=启用 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -718,7 +717,6 @@ components:
         name: { type: string, maxLength: 128 }
         person: { type: string, maxLength: 64 }
         remark: { type: string, nullable: true }
-        sort: { type: integer, default: 0 }
         status: { type: integer, enum: [0, 1], default: 1 }
     UnitUpdateRequest:
       type: object
@@ -726,7 +724,6 @@ components:
         name: { type: string, maxLength: 128 }
         person: { type: string, maxLength: 64 }
         remark: { type: string, nullable: true }
-        sort: { type: integer }
         status: { type: integer, enum: [0, 1] }
     HazardType:
       type: object

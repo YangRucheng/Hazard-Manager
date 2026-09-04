@@ -304,9 +304,6 @@ type ResponsibleUnit struct {
 	Person string  `json:"person"`
 	Remark *string `json:"remark"`
 
-	// Sort 排序（小在前）
-	Sort int `json:"sort"`
-
 	// Status 0=停用 1=启用
 	Status    ResponsibleUnitStatus `json:"status"`
 	UpdatedAt time.Time             `json:"updatedAt"`
@@ -320,7 +317,6 @@ type UnitCreateRequest struct {
 	Name   string                   `json:"name"`
 	Person string                   `json:"person"`
 	Remark *string                  `json:"remark"`
-	Sort   *int                     `json:"sort,omitempty"`
 	Status *UnitCreateRequestStatus `json:"status,omitempty"`
 }
 
@@ -332,7 +328,6 @@ type UnitUpdateRequest struct {
 	Name   *string                  `json:"name,omitempty"`
 	Person *string                  `json:"person,omitempty"`
 	Remark *string                  `json:"remark"`
-	Sort   *int                     `json:"sort,omitempty"`
 	Status *UnitUpdateRequestStatus `json:"status,omitempty"`
 }
 
