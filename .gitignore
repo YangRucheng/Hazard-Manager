@@ -1,3 +1,7 @@
+# EdgeOne Pages 本地构建产物
+.edgeone/
+web/.edgeone/
+
 # 环境与密钥
 server/.env
 web/.env
