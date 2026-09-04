@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       __API_HOST__: JSON.stringify(host),
+      // 前端打包时间（UTC ISO），供「关于」页展示。
+      __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     },
     server: {
       host: true,

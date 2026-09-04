@@ -55,20 +55,6 @@ onMounted(loadData)
         </div>
       </n-card>
     </div>
-
-    <n-card>
-      <template #header>
-        <div class="page-header">
-          <div>
-            <span class="card-title">工作台说明</span>
-            <div class="section-description">隐患登记 → 责任单位整改 → 复查验收，闭环跟进。</div>
-          </div>
-        </div>
-      </template>
-      <p class="muted dash-tip">
-        顶部统计覆盖全部隐患记录。可在左侧「隐患管理」中新增台账并按状态/类型筛选，逾期项会在列表中以「逾期」标记提醒。
-      </p>
-    </n-card>
   </div>
 </template>
 
@@ -92,11 +78,5 @@ onMounted(loadData)
 
 .stat-hint {
   font-size: 12px;
-}
-
-.dash-tip {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.8;
 }
 </style>

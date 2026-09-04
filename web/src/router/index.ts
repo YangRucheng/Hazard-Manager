@@ -10,6 +10,7 @@ import HazardFormView from '@/views/HazardFormView.vue'
 import UnitManage from '@/views/system/UnitManage.vue'
 import TypeManage from '@/views/system/TypeManage.vue'
 import AttachmentManage from '@/views/system/AttachmentManage.vue'
+import AboutView from '@/views/system/AboutView.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -35,6 +36,7 @@ const routes: RouteRecordRaw[] = [
         component: AttachmentManage,
         meta: { title: '附件管理' },
       },
+      { path: 'system/about', name: 'system-about', component: AboutView, meta: { title: '关于' } },
       { path: 'system', redirect: '/system/units' },
       // 旧「枚举值管理」路径重定向到「系统管理」。
       { path: 'enums', redirect: '/system/units' },

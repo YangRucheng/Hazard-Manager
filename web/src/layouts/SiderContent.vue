@@ -22,6 +22,7 @@ const menuOptions: MenuOption[] = [
       { label: '责任单位', key: '/system/units' },
       { label: '隐患类型', key: '/system/types' },
       { label: '附件管理', key: '/system/attachments' },
+      { label: '关于', key: '/system/about' },
     ],
   },
 ]
