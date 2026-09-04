@@ -23,10 +23,12 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # 腾讯云容器镜像仓库 CCR（registry 与 namespace 可用仓库变量覆盖）
-  REGISTRY: ${{ vars.TENCENT_CCR_REGISTRY || 'ccr.ccs.tencentyun.com' }}
-  IMAGE_NAMESPACE: ${{ vars.TENCENT_CCR_NAMESPACE || 'yangrucheng' }}
-  IMAGE: hazard-manager-web
+  # 腾讯云容器镜像仓库 CCR（镜像地址固定：sgccr.ccs.tencentyun.com/misaka-network/hazard-manager:web）
+  # registry/namespace/repo/tag 仍可用仓库变量覆盖
+  REGISTRY: ${{ vars.TENCENT_CCR_REGISTRY || 'sgccr.ccs.tencentyun.com' }}
+  IMAGE_NAMESPACE: ${{ vars.TENCENT_CCR_NAMESPACE || 'misaka-network' }}
+  IMAGE: hazard-manager
+  IMAGE_TAG: web
   # 仅 push 到 master 时才推送镜像；PR/其他分支只做构建测试，绝不推送
   SHOULD_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
@@ -218,11 +220,10 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 计算镜像全名（小写）
+      - name: 计算镜像全名（固定 tag）
         id: meta
         run: |
-          echo "TAG_LATEST=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE }}:latest" >> "$GITHUB_OUTPUT"
-          echo "TAG_SHA=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE }}:${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          echo "TAG=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE }}:${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
 
       - name: 配置 Buildx（启用 GHA 缓存）
         uses: docker/setup-buildx-action@v3
@@ -242,7 +243,6 @@ jobs:
           file: ./web/Dockerfile
           push: ${{ env.SHOULD_PUSH == 'true' }}
           tags: |
-            ${{ steps.meta.outputs.TAG_LATEST }}
-            ${{ steps.meta.outputs.TAG_SHA }}
+            ${{ steps.meta.outputs.TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
