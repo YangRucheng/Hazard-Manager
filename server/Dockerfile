@@ -1,6 +1,9 @@
 # 后端镜像：多阶段构建，Go 静态编译 + Alpine 运行时
 FROM golang:1.27-alpine AS builder
 
+# 后端编译时间（CI 传入 RFC3339；本地构建默认 unknown）
+ARG BUILD_TIME=unknown
+
 WORKDIR /build
 
 # 先拷贝依赖清单，利用层缓存
@@ -9,7 +12,7 @@ RUN go mod download
 
 COPY cmd ./cmd
 COPY internal ./internal
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/hazard-server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X 'hazard-system/server/internal/version.BuildTime=${BUILD_TIME}'" -o /out/hazard-server ./cmd/server
 
 FROM alpine:3.20
 

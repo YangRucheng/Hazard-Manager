@@ -312,6 +312,15 @@ type ResponsibleUnit struct {
 // ResponsibleUnitStatus 0=停用 1=启用
 type ResponsibleUnitStatus int
 
+// SystemInfo defines model for SystemInfo.
+type SystemInfo struct {
+	// BuildTime 后端编译时间（编译期注入，未注入为 unknown）
+	BuildTime string `json:"buildTime"`
+
+	// StartTime 服务启动时刻
+	StartTime time.Time `json:"startTime"`
+}
+
 // UnitCreateRequest defines model for UnitCreateRequest.
 type UnitCreateRequest struct {
 	Name   string                   `json:"name"`
@@ -481,6 +490,9 @@ type ServerInterface interface {
 	// 获取缩略图（缺失时回退原图）
 	// (GET /images/{id}/thumbnail)
 	GetImageThumbnail(c *gin.Context, id string)
+	// 系统信息（后端编译时间与启动时间）
+	// (GET /system/info)
+	GetSystemInfo(c *gin.Context)
 	// 责任单位列表（下拉/管理页用，含停用项）
 	// (GET /units)
 	ListUnits(c *gin.Context, params ListUnitsParams)
@@ -967,6 +979,21 @@ func (siw *ServerInterfaceWrapper) GetImageThumbnail(c *gin.Context) {
 	siw.Handler.GetImageThumbnail(c, id)
 }
 
+// GetSystemInfo operation middleware
+func (siw *ServerInterfaceWrapper) GetSystemInfo(c *gin.Context) {
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetSystemInfo(c)
+}
+
 // ListUnits operation middleware
 func (siw *ServerInterfaceWrapper) ListUnits(c *gin.Context) {
 
@@ -1106,6 +1133,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/images/:id", wrapper.DeleteImage)
 	router.GET(options.BaseURL+"/images/:id", wrapper.GetImage)
 	router.GET(options.BaseURL+"/images/:id/thumbnail", wrapper.GetImageThumbnail)
+	router.GET(options.BaseURL+"/system/info", wrapper.GetSystemInfo)
 	router.GET(options.BaseURL+"/units", wrapper.ListUnits)
 	router.POST(options.BaseURL+"/units", wrapper.CreateUnit)
 	router.DELETE(options.BaseURL+"/units/:id", wrapper.DeleteUnit)
