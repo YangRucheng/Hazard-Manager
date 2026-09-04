@@ -111,7 +111,7 @@ func (r *HazardRepo) List(f HazardFilter) ([]model.Hazard, int64, error) {
 	base := r.db.Model(&model.Hazard{}).
 		Select(`hazards.id, hazards.inspection_area, hazards.inspection_date, hazards.inspector,
 			hazards.description, hazards.suggestion, hazards.unit_id, hazards.person, hazards.due_date,
-			hazards.recheck_person, hazards.before_images, hazards.status, hazards.after_images,
+			hazards.recheck_person, hazards.rectify_person, hazards.before_images, hazards.status, hazards.after_images,
 			hazards.type_id, hazards.level, hazards.remark,
 			hazards.created_at, hazards.updated_at,
 			COALESCE(u.name, '') AS unit_name,
@@ -142,7 +142,7 @@ func (r *HazardRepo) GetByID(id uint64) (*model.Hazard, error) {
 	err := r.db.Model(&model.Hazard{}).
 		Select(`hazards.id, hazards.inspection_area, hazards.inspection_date, hazards.inspector,
 			hazards.description, hazards.suggestion, hazards.unit_id, hazards.person, hazards.due_date,
-			hazards.recheck_person, hazards.before_images, hazards.status, hazards.after_images,
+			hazards.recheck_person, hazards.rectify_person, hazards.before_images, hazards.status, hazards.after_images,
 			hazards.type_id, hazards.level, hazards.remark,
 			hazards.created_at, hazards.updated_at,
 			COALESCE(u.name, '') AS unit_name,

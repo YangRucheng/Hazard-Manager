@@ -47,3 +47,7 @@ export const API_HOST: string =
 
 /** 前端 API base url：已含 /api/v1，供 openapi-fetch 与资源 URL 使用。 */
 export const API_BASE: string = resolveApiBaseUrl(API_HOST)
+
+/** 前端打包时间（UTC ISO；构建期注入，未注入为空串）。 */
+export const BUILD_TIME: string =
+  typeof __BUILD_TIME__ !== 'undefined' && __BUILD_TIME__ ? __BUILD_TIME__ : ''

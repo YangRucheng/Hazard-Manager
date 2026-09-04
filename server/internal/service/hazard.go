@@ -132,6 +132,13 @@ func (s *HazardService) Create(req gen.HazardCreateRequest) (*gen.Hazard, *Error
 		h.RecheckPerson = &v
 	}
 
+	// 整改员工：可选，未填/留空则保持 NULL。
+	if req.RectifyPerson != nil {
+		if v := strings.TrimSpace(*req.RectifyPerson); v != "" {
+			h.RectifyPerson = &v
+		}
+	}
+
 	// 状态/等级校验与默认。
 	status := model.StatusPending
 	if req.Status != nil {
@@ -239,6 +246,16 @@ func (s *HazardService) Update(id int64, req gen.HazardUpdateRequest) (*gen.Haza
 	if req.RecheckPerson != nil {
 		v := strings.TrimSpace(*req.RecheckPerson)
 		h.RecheckPerson = &v
+	}
+
+	// 整改员工：显式提供时更新（空串清空），未提供保留原值。
+	if req.RectifyPerson != nil {
+		v := strings.TrimSpace(*req.RectifyPerson)
+		if v == "" {
+			h.RectifyPerson = nil
+		} else {
+			h.RectifyPerson = &v
+		}
 	}
 	if req.Status != nil {
 		status := model.HazardStatus(*req.Status)
@@ -408,6 +425,7 @@ func toGenHazard(h *model.Hazard) gen.Hazard {
 		Person:         h.Person,
 		DueDate:        types.Date{Time: h.DueDate.Time},
 		RecheckPerson:  h.RecheckPerson,
+		RectifyPerson:  h.RectifyPerson,
 		Status:         gen.HazardStatus(h.Status),
 		TypeId:         int64(h.TypeID),
 		TypeMajor:      h.TypeMajor,

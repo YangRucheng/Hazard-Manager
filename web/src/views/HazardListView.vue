@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import {
   NButton,
   NCard,
@@ -10,7 +9,6 @@ import {
   NPagination,
   NSelect,
   NTag,
-  useDialog,
   useMessage,
   type DataTableColumns,
   type SelectOption,
@@ -21,6 +19,7 @@ import { client, errorMessage } from '@/api/client'
 import StatusTag from '@/components/StatusTag.vue'
 import LevelTag from '@/components/LevelTag.vue'
 import ImagePreview from '@/components/ImagePreview.vue'
+import HazardFormModal from '@/components/HazardFormModal.vue'
 import { formatDate, isOverdue } from '@/utils/date'
 import { useIsMobile } from '@/utils/media'
 
@@ -42,9 +41,7 @@ interface Filters {
   dateRange: [number, number] | null
 }
 
-const router = useRouter()
 const message = useMessage()
-const dialog = useDialog()
 const isMobile = useIsMobile()
 
 const loading = ref(false)
@@ -54,6 +51,10 @@ const page = ref(1)
 const pageSize = ref(10)
 const units = ref<ResponsibleUnit[]>([])
 const types = ref<HazardType[]>([])
+
+/** 新增/编辑弹窗（hazardId 为空表示新增）。 */
+const showModal = ref(false)
+const editingId = ref<number | null>(null)
 
 const filters = ref<Filters>({
   status: null,
@@ -162,30 +163,23 @@ function handleReset(): void {
   void loadList()
 }
 
-function goCreate(): void {
-  void router.push({ name: 'hazard-create' })
+function openCreate(): void {
+  editingId.value = null
+  showModal.value = true
 }
 
-function goEdit(id: number): void {
-  void router.push({ name: 'hazard-edit', params: { id: String(id) } })
+function openEdit(row: Hazard): void {
+  editingId.value = row.id
+  showModal.value = true
 }
 
-function confirmDelete(row: Hazard): void {
-  dialog.warning({
-    title: '删除隐患',
-    content: `确定删除「${row.description}」吗？删除后不可恢复。`,
-    positiveText: '删除',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      const { error } = await client.DELETE('/hazards/{id}', { params: { path: { id: row.id } } })
-      if (error) {
-        message.error(errorMessage(error))
-        return
-      }
-      message.success('已删除')
-      void loadList()
-    },
-  })
+/** 整行可点击弹出编辑弹窗（操作列已移除，删除在弹窗内）。 */
+function rowProps(row: Hazard) {
+  return { onClick: () => openEdit(row) }
+}
+
+function handleAfterSaved(): void {
+  void loadList()
 }
 
 const columns: DataTableColumns<Hazard> = [
@@ -202,6 +196,12 @@ const columns: DataTableColumns<Hazard> = [
   },
   { title: '责任单位', key: 'unitName', width: 110, ellipsis: { tooltip: true } },
   { title: '责任人', key: 'person', width: 80 },
+  {
+    title: '整改员工',
+    key: 'rectifyPerson',
+    width: 100,
+    render: (row) => row.rectifyPerson || '—',
+  },
   { title: '要求完成', key: 'dueDate', width: 105 },
   {
     title: '状态',
@@ -227,22 +227,13 @@ const columns: DataTableColumns<Hazard> = [
     title: '整改前图片',
     key: 'beforeImageIds',
     width: 150,
-    render: (row) => h(ImagePreview, { imageIds: row.beforeImageIds, size: 36 }),
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 140,
-    fixed: 'right',
     render: (row) =>
-      h('div', { style: 'display:flex;gap:8px' }, [
-        h(NButton, { size: 'small', onClick: () => goEdit(row.id) }, { default: () => '编辑' }),
-        h(
-          NButton,
-          { size: 'small', type: 'error', secondary: true, onClick: () => confirmDelete(row) },
-          { default: () => '删除' },
-        ),
-      ]),
+      h(
+        'span',
+        // 点缩略图仅预览，不冒泡触发整行编辑弹窗。
+        { onClick: (e: MouseEvent) => e.stopPropagation() },
+        [h(ImagePreview, { imageIds: row.beforeImageIds, size: 36 })],
+      ),
   },
 ]
 
@@ -259,7 +250,7 @@ onMounted(() => {
       <div>
         <h1 class="page-title">隐患台账</h1>
       </div>
-      <n-button type="primary" @click="goCreate">新增隐患</n-button>
+      <n-button type="primary" @click="openCreate">新增隐患</n-button>
     </div>
 
     <n-card class="filter-card">
@@ -352,11 +343,13 @@ onMounted(() => {
 
     <n-card class="data-card">
       <n-data-table
+        class="row-clickable"
         :columns="columns"
         :data="items"
         :loading="loading"
         :bordered="false"
         :row-key="(row: Hazard) => row.id"
+        :row-props="rowProps"
         :scroll-x="1500"
         size="small"
       />
@@ -374,6 +367,13 @@ onMounted(() => {
         />
       </div>
     </n-card>
+
+    <HazardFormModal
+      v-model:show="showModal"
+      :hazard-id="editingId"
+      @saved="handleAfterSaved"
+      @deleted="handleAfterSaved"
+    />
   </div>
 </template>
 
@@ -381,11 +381,15 @@ onMounted(() => {
 .filter-fields {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 2px 16px;
+  gap: 12px 16px;
 }
 
 .filter-fields .filter-field {
   min-width: 0;
+}
+
+.filter-fields .filter-field > span {
+  line-height: 1.5;
 }
 
 .type-cell {
@@ -395,6 +399,14 @@ onMounted(() => {
 .pager-total {
   margin-right: auto;
   font-size: 13px;
+}
+
+.row-clickable :deep(.n-data-table-tr) {
+  cursor: pointer;
+}
+
+.row-clickable :deep(.n-data-table-tr:hover) {
+  background: rgba(63, 99, 216, 0.05);
 }
 
 @media (max-width: 640px) {

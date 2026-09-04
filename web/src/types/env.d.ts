@@ -6,3 +6,9 @@
  * 具体解析见 src/api/config.ts。
  */
 declare const __API_HOST__: string | undefined
+
+/**
+ * 构建期由 Vite `define` 注入的前端打包时间（UTC ISO 字符串）。
+ * 消费见 src/api/config.ts 的 BUILD_TIME。
+ */
+declare const __BUILD_TIME__: string | undefined

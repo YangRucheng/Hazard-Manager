@@ -39,3 +39,21 @@ export function isOverdue(dueDate: string, status: string): boolean {
   }
   return dueDate < today()
 }
+
+/** 日期对象转本地时区 YYYY-MM-DD HH:mm。 */
+export function formatDateTime(d: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${formatDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** ISO 时间串（含构建时间等）转本地时区显示；空/非法返回空串由调用方兜底。 */
+export function formatIsoDateTime(iso?: string | null): string {
+  if (!iso) {
+    return ''
+  }
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) {
+    return ''
+  }
+  return formatDateTime(d)
+}

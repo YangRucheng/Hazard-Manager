@@ -11,6 +11,7 @@ import (
 	"hazard-system/server/internal/gen"
 	"hazard-system/server/internal/service"
 	"hazard-system/server/internal/upload"
+	"hazard-system/server/internal/version"
 )
 
 // Server 实现全部 API 端点。
@@ -74,6 +75,20 @@ func (s *Server) GetCurrentUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gen.UserInfo{
 		Username: claims.Subject,
 		UserType: gen.UserInfoUserType(claims.UserType),
+	})
+}
+
+// ---- 系统信息 ----
+
+// GetSystemInfo 系统信息：返回后端编译时间与启动时间。
+func (s *Server) GetSystemInfo(c *gin.Context) {
+	buildTime := version.BuildTime
+	if buildTime == "" {
+		buildTime = "unknown"
+	}
+	c.JSON(http.StatusOK, gen.SystemInfo{
+		BuildTime: buildTime,
+		StartTime: version.StartTime,
 	})
 }
 

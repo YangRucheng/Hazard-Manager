@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
 import {
   NButton,
-  NCard,
   NDatePicker,
   NForm,
   NFormItem,
   NGrid,
   NGridItem,
   NInput,
+  NModal,
   NSelect,
+  useDialog,
   useMessage,
   type FormInst,
   type FormRules,
@@ -38,6 +38,7 @@ interface FormModel {
   suggestion: string
   unitId: number | null
   recheckPerson: string
+  rectifyPerson: string
   beforeImageIds: string[]
   status: HazardStatus
   afterImageIds: string[]
@@ -46,13 +47,21 @@ interface FormModel {
   remark: string
 }
 
-const route = useRoute()
-const router = useRouter()
+const props = withDefaults(defineProps<{ show: boolean; hazardId?: number | null }>(), {
+  hazardId: null,
+})
+
+const emit = defineEmits<{
+  'update:show': [value: boolean]
+  saved: []
+  deleted: []
+}>()
+
 const message = useMessage()
+const dialog = useDialog()
 const isMobile = useIsMobile()
 
-const isEdit = computed<boolean>(() => route.name === 'hazard-edit')
-const hazardId = computed<number>(() => Number(route.params.id))
+const isEdit = computed<boolean>(() => props.hazardId != null)
 
 const formRef = ref<FormInst | null>(null)
 const saving = ref(false)
@@ -71,6 +80,7 @@ const form = ref<FormModel>({
   suggestion: '',
   unitId: null,
   recheckPerson: '',
+  rectifyPerson: '',
   beforeImageIds: [],
   status: '待整改',
   afterImageIds: [],
@@ -126,6 +136,31 @@ const rules: FormRules = {
   typeId: { required: true, type: 'number', message: '请选择隐患类型', trigger: ['change'] },
 }
 
+function defaultForm(): FormModel {
+  return {
+    inspectionArea: '华星现场',
+    inspector: '电气自查',
+    description: '',
+    suggestion: '',
+    unitId: null,
+    recheckPerson: '',
+    rectifyPerson: '',
+    beforeImageIds: [],
+    status: '待整改',
+    afterImageIds: [],
+    typeId: null,
+    level: '一般隐患',
+    remark: '',
+  }
+}
+
+function resetDates(): void {
+  const now = startOfToday()
+  inspectionTs.value = now
+  dueTs.value = addDaysTimestamp(now, 7)
+  dueTouched = false
+}
+
 async function loadEnums(): Promise<void> {
   const [unitRes, typeRes] = await Promise.all([client.GET('/units'), client.GET('/hazard-types')])
   if (unitRes.error || !unitRes.data) {
@@ -140,24 +175,13 @@ async function loadEnums(): Promise<void> {
   types.value = typeRes.data
 }
 
-async function loadDetail(): Promise<void> {
-  if (!isEdit.value) {
+async function loadDetail(id: number): Promise<void> {
+  const { data, error } = await client.GET('/hazards/{id}', { params: { path: { id } } })
+  if (error || !data) {
+    message.error(errorMessage(error))
     return
   }
-  loading.value = true
-  try {
-    const { data, error } = await client.GET('/hazards/{id}', {
-      params: { path: { id: hazardId.value } },
-    })
-    if (error || !data) {
-      message.error(errorMessage(error))
-      void router.replace({ name: 'hazards' })
-      return
-    }
-    applyDetail(data)
-  } finally {
-    loading.value = false
-  }
+  applyDetail(data)
 }
 
 function applyDetail(h: Hazard): void {
@@ -168,6 +192,7 @@ function applyDetail(h: Hazard): void {
     suggestion: h.suggestion ?? '',
     unitId: h.unitId,
     recheckPerson: h.recheckPerson ?? '',
+    rectifyPerson: h.rectifyPerson ?? '',
     beforeImageIds: h.beforeImageIds ?? [],
     status: h.status,
     afterImageIds: h.afterImageIds ?? [],
@@ -180,6 +205,31 @@ function applyDetail(h: Hazard): void {
   dueTouched = true
 }
 
+/** 打开时重置并（编辑态）拉取最新详情。 */
+async function prepare(): Promise<void> {
+  form.value = defaultForm()
+  resetDates()
+  formRef.value?.restoreValidation()
+  loading.value = true
+  try {
+    await loadEnums()
+    if (props.hazardId != null) {
+      await loadDetail(props.hazardId)
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(
+  () => props.show,
+  (open) => {
+    if (open) {
+      void prepare()
+    }
+  },
+)
+
 function handleInspectionDateChange(ts: number | null): void {
   inspectionTs.value = ts
   if (!dueTouched && ts !== null) {
@@ -190,6 +240,10 @@ function handleInspectionDateChange(ts: number | null): void {
 function handleDueDateChange(ts: number | null): void {
   dueTs.value = ts
   dueTouched = true
+}
+
+function close(): void {
+  emit('update:show', false)
 }
 
 async function handleSubmit(): Promise<void> {
@@ -219,6 +273,7 @@ async function handleSubmit(): Promise<void> {
       unitId: form.value.unitId,
       dueDate: formatDate(new Date(dueTs.value)),
       recheckPerson: form.value.recheckPerson.trim() || null,
+      rectifyPerson: form.value.rectifyPerson.trim() || null,
       beforeImageIds: form.value.beforeImageIds,
       status: form.value.status,
       afterImageIds: form.value.afterImageIds,
@@ -227,9 +282,9 @@ async function handleSubmit(): Promise<void> {
       remark: form.value.remark.trim() || null,
     }
 
-    if (isEdit.value) {
+    if (props.hazardId != null) {
       const { data, error } = await client.PUT('/hazards/{id}', {
-        params: { path: { id: hazardId.value } },
+        params: { path: { id: props.hazardId } },
         body: common,
       })
       if (error || !data) {
@@ -245,14 +300,36 @@ async function handleSubmit(): Promise<void> {
       }
       message.success('新增成功')
     }
-    void router.push({ name: 'hazards' })
+    emit('saved')
+    close()
   } finally {
     saving.value = false
   }
 }
 
-function handleCancel(): void {
-  void router.push({ name: 'hazards' })
+/** 删除按钮位于弹窗底部左侧：二次确认后软删除。 */
+function confirmDelete(): void {
+  if (props.hazardId == null) {
+    return
+  }
+  dialog.warning({
+    title: '删除隐患',
+    content: '确定删除该隐患记录吗？删除后不可恢复。',
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      const { error } = await client.DELETE('/hazards/{id}', {
+        params: { path: { id: props.hazardId as number } },
+      })
+      if (error) {
+        message.error(errorMessage(error))
+        return
+      }
+      message.success('已删除')
+      emit('deleted')
+      close()
+    },
+  })
 }
 
 function startOfToday(): number {
@@ -264,23 +341,19 @@ function startOfToday(): number {
 function addDaysTimestamp(ts: number, days: number): number {
   return ts + days * 24 * 60 * 60 * 1000
 }
-
-onMounted(() => {
-  void loadEnums()
-  void loadDetail()
-})
 </script>
 
 <template>
-  <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">{{ isEdit ? '编辑隐患' : '新增隐患' }}</h1>
-      </div>
-      <n-button @click="handleCancel">返回列表</n-button>
-    </div>
-
-    <n-card>
+  <n-modal
+    :show="show"
+    preset="card"
+    draggable
+    :title="isEdit ? '编辑隐患' : '新增隐患'"
+    style="width: min(820px, calc(100vw - 24px))"
+    :mask-closable="false"
+    @update:show="close"
+  >
+    <div class="modal-body">
       <n-form
         ref="formRef"
         :model="form"
@@ -288,9 +361,8 @@ onMounted(() => {
         :label-placement="isMobile ? 'top' : 'left'"
         :label-width="isMobile ? undefined : 100"
         :disabled="loading"
-        style="max-width: 1120px"
       >
-        <n-grid :cols="isMobile ? 1 : 2" :x-gap="28">
+        <n-grid :cols="isMobile ? 1 : 2" :x-gap="24">
           <n-grid-item>
             <n-form-item label="检查区域" path="inspectionArea">
               <n-input v-model:value="form.inspectionArea" placeholder="默认：华星现场" />
@@ -364,10 +436,12 @@ onMounted(() => {
           </n-grid-item>
           <n-grid-item>
             <n-form-item label="复查人员">
-              <n-input
-                v-model:value="form.recheckPerson"
-                placeholder="留空则默认同检查人员"
-              />
+              <n-input v-model:value="form.recheckPerson" placeholder="留空则默认同检查人员" />
+            </n-form-item>
+          </n-grid-item>
+          <n-grid-item>
+            <n-form-item label="整改员工">
+              <n-input v-model:value="form.rectifyPerson" placeholder="负责整改的员工（可选）" />
             </n-form-item>
           </n-grid-item>
           <n-grid-item>
@@ -408,23 +482,38 @@ onMounted(() => {
             </n-form-item>
           </n-grid-item>
         </n-grid>
+      </n-form>
+    </div>
 
-        <div class="form-actions">
-          <n-button @click="handleCancel">取消</n-button>
+    <template #footer>
+      <div class="modal-footer">
+        <div class="modal-footer-left">
+          <n-button v-if="isEdit" type="error" secondary @click="confirmDelete">删除</n-button>
+        </div>
+        <div class="modal-footer-right">
+          <n-button @click="close">取消</n-button>
           <n-button type="primary" :loading="saving" @click="handleSubmit">保存</n-button>
         </div>
-      </n-form>
-    </n-card>
-  </div>
+      </div>
+    </template>
+  </n-modal>
 </template>
 
 <style scoped>
-.form-actions {
+.modal-body {
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+}
+
+.modal-footer {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border-subtle);
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.modal-footer-right {
+  display: flex;
+  gap: 8px;
 }
 </style>
