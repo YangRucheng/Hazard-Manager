@@ -8,14 +8,14 @@ import {
   NFormItem,
   NInput,
   NModal,
+  NSelect,
   NTag,
-  NAutoComplete,
   useDialog,
   useMessage,
   type DataTableColumns,
   type FormInst,
   type FormRules,
-  type AutoCompleteOption,
+  type SelectOption,
 } from 'naive-ui'
 
 import { client, errorMessage } from '@/api/client'
@@ -41,10 +41,10 @@ const saving = ref(false)
 const formRef = ref<FormInst | null>(null)
 const form = ref<TypeFormModel>({ major: '', minor: '' })
 
-/** 已有大类（去重，作为大类下拉输入框的候选项）。 */
-const majorOptions = computed<AutoCompleteOption[]>(() => {
+/** 已有大类（去重），作为大类下拉候选（供筛选与新增/编辑复用）。 */
+const majorOptions = computed<SelectOption[]>(() => {
   const seen = new Set<string>()
-  const options: AutoCompleteOption[] = []
+  const options: SelectOption[] = []
   for (const t of list.value) {
     if (t.major && !seen.has(t.major)) {
       seen.add(t.major)
@@ -53,6 +53,12 @@ const majorOptions = computed<AutoCompleteOption[]>(() => {
   }
   return options
 })
+
+/** 按大类筛选后的展示列表（未选则全量）。 */
+const majorFilter = ref<string | null>(null)
+const filteredList = computed(() =>
+  majorFilter.value ? list.value.filter((t) => t.major === majorFilter.value) : list.value,
+)
 
 const rules: FormRules = {
   major: {
@@ -155,7 +161,6 @@ function confirmDelete(): void {
 }
 
 const columns: DataTableColumns<HazardType> = [
-  { title: 'ID', key: 'id', width: 80 },
   {
     title: '大类',
     key: 'major',
@@ -181,13 +186,26 @@ onMounted(loadList)
     </div>
 
     <n-card class="data-card">
+      <div class="table-toolbar">
+        <label class="filter-field">
+          <span>大类</span>
+          <n-select
+            v-model:value="majorFilter"
+            :options="majorOptions"
+            placeholder="全部大类"
+            clearable
+            filterable
+            style="width: 220px"
+          />
+        </label>
+      </div>
       <n-data-table
         class="row-clickable"
         :columns="columns"
-        :data="list"
+        :data="filteredList"
         :loading="loading"
         :bordered="false"
-        :scroll-x="760"
+        :scroll-x="520"
         size="small"
         :row-key="(row: HazardType) => row.id"
         :row-props="rowProps"
@@ -204,13 +222,13 @@ onMounted(loadList)
     >
       <n-form ref="formRef" :model="form" :rules="rules" label-placement="top">
         <n-form-item label="大类" path="major">
-          <n-auto-complete
+          <n-select
             v-model:value="form.major"
             :options="majorOptions"
             placeholder="可下拉选择已有大类，也可直接输入新大类"
+            filterable
+            tag
             clearable
-            show-empty
-            :get-show="() => true"
           />
         </n-form-item>
         <n-form-item label="小类" path="minor">
@@ -241,6 +259,16 @@ onMounted(loadList)
 
 .row-clickable :deep(.n-data-table-tr:hover) {
   background: rgba(63, 99, 216, 0.05);
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.table-toolbar .filter-field {
+  width: 220px;
 }
 
 .modal-footer {
