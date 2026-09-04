@@ -1,9 +1,10 @@
 name: 后端：基础测试·契约·端到端·镜像
 
-# 后端相关改动才触发（server/ 或契约 api/ 变更时两端都要校验，故也监听 api/）。
+# PR：合并前全量检查；push 到 master（合并后）：不再重复检查，仅构建推送镜像。
+# 触发路径：server/ 或契约 api/ 变更时两端都要校验，故也监听 api/。
 on:
   push:
-    branches: ["**"]
+    branches: [master]
     paths:
       - "server/**"
       - "api/**"
@@ -35,6 +36,7 @@ env:
 jobs:
   # ---------- 基础测试 ----------
   unit-tests:
+    if: github.event_name == 'pull_request'
     name: 基础测试（gofmt / vet / build / go test 含集成）
     runs-on: ubuntu-latest
     services:
@@ -89,6 +91,7 @@ jobs:
 
   # ---------- 接口契约一致性 ----------
   contract-check:
+    if: github.event_name == 'pull_request'
     name: 契约一致性（api.gen.go 与 openapi.yaml 对齐）
     runs-on: ubuntu-latest
     steps:
@@ -115,6 +118,7 @@ jobs:
 
   # ---------- 端到端测试 ----------
   e2e:
+    if: github.event_name == 'pull_request'
     name: 端到端测试（真实 MySQL + 后端实例模拟操作）
     runs-on: ubuntu-latest
     needs: [unit-tests, contract-check]
@@ -183,7 +187,6 @@ jobs:
   build-push:
     name: 镜像构建与推送（CCR）
     runs-on: ubuntu-latest
-    needs: [unit-tests, contract-check, e2e]
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
