@@ -196,6 +196,12 @@ const columns: DataTableColumns<Hazard> = [
   },
   { title: '责任单位', key: 'unitName', width: 110, ellipsis: { tooltip: true } },
   { title: '责任人', key: 'person', width: 80 },
+  {
+    title: '整改员工',
+    key: 'rectifyPerson',
+    width: 100,
+    render: (row) => row.rectifyPerson || '—',
+  },
   { title: '要求完成', key: 'dueDate', width: 105 },
   {
     title: '状态',
@@ -344,7 +350,7 @@ onMounted(() => {
         :bordered="false"
         :row-key="(row: Hazard) => row.id"
         :row-props="rowProps"
-        :scroll-x="1400"
+        :scroll-x="1500"
         size="small"
       />
       <div class="pagination-bar">

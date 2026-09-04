@@ -625,6 +625,7 @@ components:
         person: { type: string, description: 责任人（单位冗余快照） }
         dueDate: { type: string, format: date, description: 要求完成整改时间，默认检查日期+7天 }
         recheckPerson: { type: string, nullable: true, description: 复查人员 }
+        rectifyPerson: { type: string, nullable: true, maxLength: 64, description: 整改员工（负责整改的员工，可选） }
         beforeImageIds:
           type: array
           items: { type: string, description: 图片 uuid }
@@ -655,6 +656,7 @@ components:
         unitId: { type: integer, format: int64, description: 责任单位 id（必填，责任人由此关联） }
         dueDate: { type: string, format: date, description: 缺省=检查日期+7天 }
         recheckPerson: { type: string, maxLength: 64, nullable: true, description: 缺省=检查人员 }
+        rectifyPerson: { type: string, maxLength: 64, nullable: true, description: 整改员工（可选，可留空） }
         beforeImageIds:
           type: array
           maxItems: 20
@@ -685,6 +687,7 @@ components:
         unitId: { type: integer, format: int64 }
         dueDate: { type: string, format: date }
         recheckPerson: { type: string, maxLength: 64, nullable: true }
+        rectifyPerson: { type: string, maxLength: 64, nullable: true, description: 整改员工（提供即覆盖，传空串清空） }
         beforeImageIds:
           type: array
           maxItems: 20

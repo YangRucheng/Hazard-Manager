@@ -311,6 +311,8 @@ export interface components {
             dueDate: string;
             /** @description 复查人员 */
             recheckPerson?: string | null;
+            /** @description 整改员工（负责整改的员工，可选） */
+            rectifyPerson?: string | null;
             /** @description 整改前图片 uuid 列表 */
             beforeImageIds?: string[];
             status: components["schemas"]["HazardStatus"];
@@ -357,6 +359,8 @@ export interface components {
             dueDate?: string;
             /** @description 缺省=检查人员 */
             recheckPerson?: string | null;
+            /** @description 整改员工（可选，可留空） */
+            rectifyPerson?: string | null;
             beforeImageIds?: string[];
             /** @default 待整改 */
             status: components["schemas"]["HazardStatus"];
@@ -383,6 +387,8 @@ export interface components {
             /** Format: date */
             dueDate?: string;
             recheckPerson?: string | null;
+            /** @description 整改员工（提供即覆盖，传空串清空） */
+            rectifyPerson?: string | null;
             beforeImageIds?: string[];
             status?: components["schemas"]["HazardStatus"];
             afterImageIds?: string[];

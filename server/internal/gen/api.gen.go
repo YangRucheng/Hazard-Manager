@@ -93,7 +93,10 @@ type Hazard struct {
 	Person string `json:"person"`
 
 	// RecheckPerson 复查人员
-	RecheckPerson *string      `json:"recheckPerson"`
+	RecheckPerson *string `json:"recheckPerson"`
+
+	// RectifyPerson 整改员工（负责整改的员工，可选）
+	RectifyPerson *string      `json:"rectifyPerson"`
 	Remark        *string      `json:"remark"`
 	Status        HazardStatus `json:"status"`
 
@@ -135,7 +138,10 @@ type HazardCreateRequest struct {
 	Level          *HazardLevel        `json:"level,omitempty"`
 
 	// RecheckPerson 缺省=检查人员
-	RecheckPerson *string       `json:"recheckPerson"`
+	RecheckPerson *string `json:"recheckPerson"`
+
+	// RectifyPerson 整改员工（可选，可留空）
+	RectifyPerson *string       `json:"rectifyPerson"`
 	Remark        *string       `json:"remark"`
 	Status        *HazardStatus `json:"status,omitempty"`
 	Suggestion    *string       `json:"suggestion"`
@@ -213,9 +219,12 @@ type HazardUpdateRequest struct {
 	Inspector      *string             `json:"inspector,omitempty"`
 	Level          *HazardLevel        `json:"level,omitempty"`
 	RecheckPerson  *string             `json:"recheckPerson"`
-	Remark         *string             `json:"remark"`
-	Status         *HazardStatus       `json:"status,omitempty"`
-	Suggestion     *string             `json:"suggestion"`
+
+	// RectifyPerson 整改员工（提供即覆盖，传空串清空）
+	RectifyPerson *string       `json:"rectifyPerson"`
+	Remark        *string       `json:"remark"`
+	Status        *HazardStatus `json:"status,omitempty"`
+	Suggestion    *string       `json:"suggestion"`
 
 	// TypeId 隐患类型组合行 id
 	TypeId *int64 `json:"typeId,omitempty"`

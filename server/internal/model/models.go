@@ -182,6 +182,7 @@ type Hazard struct {
 	Person         string         `gorm:"type:varchar(64);not null;default:''" json:"person"`
 	DueDate        Date           `gorm:"type:date;not null" json:"dueDate"`
 	RecheckPerson  *string        `gorm:"type:varchar(64)" json:"recheckPerson"`
+	RectifyPerson  *string        `gorm:"type:varchar(64)" json:"rectifyPerson"`
 	BeforeImages   string         `gorm:"type:varchar(2048);not null;default:''" json:"-"`
 	Status         HazardStatus   `gorm:"type:enum('待整改','整改受阻','已整改');not null;default:'待整改'" json:"status"`
 	AfterImages    string         `gorm:"type:varchar(2048);not null;default:''" json:"-"`

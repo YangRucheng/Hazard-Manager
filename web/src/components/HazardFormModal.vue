@@ -38,6 +38,7 @@ interface FormModel {
   suggestion: string
   unitId: number | null
   recheckPerson: string
+  rectifyPerson: string
   beforeImageIds: string[]
   status: HazardStatus
   afterImageIds: string[]
@@ -79,6 +80,7 @@ const form = ref<FormModel>({
   suggestion: '',
   unitId: null,
   recheckPerson: '',
+  rectifyPerson: '',
   beforeImageIds: [],
   status: '待整改',
   afterImageIds: [],
@@ -142,6 +144,7 @@ function defaultForm(): FormModel {
     suggestion: '',
     unitId: null,
     recheckPerson: '',
+    rectifyPerson: '',
     beforeImageIds: [],
     status: '待整改',
     afterImageIds: [],
@@ -189,6 +192,7 @@ function applyDetail(h: Hazard): void {
     suggestion: h.suggestion ?? '',
     unitId: h.unitId,
     recheckPerson: h.recheckPerson ?? '',
+    rectifyPerson: h.rectifyPerson ?? '',
     beforeImageIds: h.beforeImageIds ?? [],
     status: h.status,
     afterImageIds: h.afterImageIds ?? [],
@@ -269,6 +273,7 @@ async function handleSubmit(): Promise<void> {
       unitId: form.value.unitId,
       dueDate: formatDate(new Date(dueTs.value)),
       recheckPerson: form.value.recheckPerson.trim() || null,
+      rectifyPerson: form.value.rectifyPerson.trim() || null,
       beforeImageIds: form.value.beforeImageIds,
       status: form.value.status,
       afterImageIds: form.value.afterImageIds,
@@ -432,6 +437,11 @@ function addDaysTimestamp(ts: number, days: number): number {
           <n-grid-item>
             <n-form-item label="复查人员">
               <n-input v-model:value="form.recheckPerson" placeholder="留空则默认同检查人员" />
+            </n-form-item>
+          </n-grid-item>
+          <n-grid-item>
+            <n-form-item label="整改员工">
+              <n-input v-model:value="form.rectifyPerson" placeholder="负责整改的员工（可选）" />
             </n-form-item>
           </n-grid-item>
           <n-grid-item>
