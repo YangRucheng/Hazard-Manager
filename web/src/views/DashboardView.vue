@@ -1,24 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref, h } from 'vue'
-import { useRouter } from 'vue-router'
-import { NCard, NGrid, NGridItem, NDataTable, NTag, useMessage, type DataTableColumns, NButton } from 'naive-ui'
+import { onMounted, ref } from 'vue'
+import { NCard, NGrid, NGridItem, useMessage } from 'naive-ui'
 
 import { client, errorMessage } from '@/api/client'
-import StatusTag from '@/components/StatusTag.vue'
-import LevelTag from '@/components/LevelTag.vue'
-import ImagePreview from '@/components/ImagePreview.vue'
-import { isOverdue } from '@/utils/date'
 
 import type { components } from '@/api/schema'
 
-type Hazard = components['schemas']['Hazard']
 type HazardStats = components['schemas']['HazardStats']
 
-const router = useRouter()
 const message = useMessage()
 
 const stats = ref<HazardStats>({ pending: 0, blocked: 0, done: 0, overdue: 0 })
-const recent = ref<Hazard[]>([])
 const loading = ref(false)
 
 const statCards = [
@@ -31,78 +23,16 @@ const statCards = [
 async function loadData(): Promise<void> {
   loading.value = true
   try {
-    const [statsRes, listRes] = await Promise.all([
-      client.GET('/hazards/stats'),
-      client.GET('/hazards', { params: { query: { page: 1, pageSize: 8 } } }),
-    ])
-    if (statsRes.error || !statsRes.data) {
-      message.error(errorMessage(statsRes.error))
+    const { data, error } = await client.GET('/hazards/stats')
+    if (error || !data) {
+      message.error(errorMessage(error))
       return
     }
-    stats.value = statsRes.data
-    if (listRes.error || !listRes.data) {
-      message.error(errorMessage(listRes.error))
-      return
-    }
-    recent.value = listRes.data.items
+    stats.value = data
   } finally {
     loading.value = false
   }
 }
-
-function editHazard(id: number): void {
-  void router.push({ name: 'hazard-edit', params: { id: String(id) } })
-}
-
-const columns: DataTableColumns<Hazard> = [
-  { title: '检查日期', key: 'inspectionDate', width: 110 },
-  {
-    title: '隐患描述',
-    key: 'description',
-    ellipsis: { tooltip: true },
-    minWidth: 220,
-  },
-  { title: '责任单位', key: 'unitName', width: 120 },
-  { title: '责任人', key: 'person', width: 90 },
-  {
-    title: '整改前图片',
-    key: 'beforeImageIds',
-    width: 150,
-    render: (row) =>
-      h(ImagePreview, { imageIds: row.beforeImageIds, size: 36 }),
-  },
-  {
-    title: '状态',
-    key: 'status',
-    width: 100,
-    render: (row) => {
-      const overdue = isOverdue(row.dueDate, row.status)
-      return h('div', { style: 'display:flex;align-items:center;gap:6px' }, [
-        h(StatusTag, { status: row.status }),
-        overdue
-          ? h(NTag, { type: 'error', size: 'small', bordered: false }, { default: () => '逾期' })
-          : null,
-      ])
-    },
-  },
-  {
-    title: '等级',
-    key: 'level',
-    width: 90,
-    render: (row) => h(LevelTag, { level: row.level }),
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 80,
-    render: (row) =>
-      h(
-        NButton,
-        { size: 'small', type: 'primary', secondary: true, onClick: () => editHazard(row.id) },
-        { default: () => '查看' },
-      ),
-  },
-]
 
 onMounted(loadData)
 </script>
@@ -111,23 +41,12 @@ onMounted(loadData)
   <div class="page">
     <n-grid :x-gap="14" :y-gap="14" cols="1 s:2 m:4" responsive="screen">
       <n-grid-item v-for="card in statCards" :key="card.key">
-        <n-card class="stat-card" :bordered="true">
+        <n-card class="stat-card" :bordered="true" :loading="loading">
           <div class="stat-label" :style="{ color: card.color }">{{ card.label }}</div>
           <div class="stat-value">{{ stats[card.key] }}</div>
         </n-card>
       </n-grid-item>
     </n-grid>
-
-    <n-card title="最近隐患" style="margin-top: 14px" :bordered="true">
-      <n-data-table
-        :columns="columns"
-        :data="recent"
-        :loading="loading"
-        :bordered="false"
-        :row-key="(row: Hazard) => row.id"
-        size="small"
-      />
-    </n-card>
   </div>
 </template>
 
