@@ -381,11 +381,15 @@ onMounted(() => {
 .filter-fields {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 2px 16px;
+  gap: 12px 16px;
 }
 
 .filter-fields .filter-field {
   min-width: 0;
+}
+
+.filter-fields .filter-field > span {
+  line-height: 1.5;
 }
 
 .type-cell {
