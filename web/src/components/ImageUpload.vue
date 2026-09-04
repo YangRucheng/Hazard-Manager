@@ -3,7 +3,6 @@ import { ref } from 'vue'
 import {
   NUpload,
   NUploadDragger,
-  NImage,
   NButton,
   NIcon,
   useMessage,
@@ -12,6 +11,7 @@ import {
 } from 'naive-ui'
 import { CloseOutline, CloudUploadOutline } from '@vicons/ionicons5'
 
+import AuthImage from '@/components/AuthImage.vue'
 import { thumbnailUrl, imageUrl } from '@/api/client'
 import { uploadImage } from '@/api/upload'
 
@@ -77,13 +77,7 @@ function handleBeforeUpload(data: { file: UploadFileInfo }): boolean {
   <div>
     <div v-if="modelValue.length > 0" class="uploaded-list">
       <div v-for="id in modelValue" :key="id" class="uploaded-item">
-        <n-image
-          :src="thumbnailUrl(id)"
-          :preview-src="imageUrl(id)"
-          width="64"
-          height="64"
-          object-fit="cover"
-        />
+        <AuthImage :url="thumbnailUrl(id)" :preview-url="imageUrl(id)" :width="64" :height="64" />
         <n-button
           class="remove-btn"
           size="tiny"

@@ -127,6 +127,7 @@ pnpm schema
 
 - 管理用户唯一为 `admin`，密码由环境变量 `ADMIN_PASSWORD` 指定，**不入数据库**；登录签发 HS256 JWT（`JWT_SECRET`、`JWT_TOKEN_TTL_MINUTES`，默认 1440 分钟）。
 - 除 `POST /api/v1/auth/login` 外，全部接口要求 `Authorization: Bearer <JWT>` 且 `user_type == "admin"`。
+- 图片二进制接口同样受鉴权保护；浏览器 `<img>` / `window.open` 无法携带请求头，故前端统一经 `fetch`（带 Bearer）取回 blob 转 objectURL 渲染（`authedBlobUrl` + `AuthImage` 组件，会话级缓存去重），不放开图片路由的鉴权。
 - JWT Claims 含 `user_type`（`admin | mini`），为后续**小程序端**预留：小程序用户届时走同一签发/校验链路、另起路由组即可，无需改动管理端鉴权。
 - 登出为无状态方案（前端清除令牌），不做黑名单/refresh token（记为本期取舍与扩展点）。
 - 空密码恒定时间比较已显式拦截（防止 `ConstantTimeCompare` 空串误判）。

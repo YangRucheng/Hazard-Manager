@@ -3,7 +3,6 @@ import { h, onMounted, ref } from 'vue'
 import {
   NButton,
   NDataTable,
-  NImage,
   NPagination,
   NSwitch,
   NTag,
@@ -12,7 +11,8 @@ import {
   type DataTableColumns,
 } from 'naive-ui'
 
-import { client, errorMessage, imageUrl, thumbnailUrl } from '@/api/client'
+import AuthImage from '@/components/AuthImage.vue'
+import { authedBlobUrl, client, errorMessage, imageUrl, thumbnailUrl } from '@/api/client'
 import { useIsMobile } from '@/utils/media'
 
 import type { components } from '@/api/schema'
@@ -106,8 +106,22 @@ function confirmDelete(row: ImageSummary): void {
   })
 }
 
-function openOriginal(row: ImageSummary): void {
-  window.open(imageUrl(row.id), '_blank', 'noopener')
+/** 原图与列表缩略图同样受鉴权保护，需带令牌取回 blob 后再在新标签打开。 */
+const openingId = ref<string | null>(null)
+
+async function openOriginal(row: ImageSummary): Promise<void> {
+  if (openingId.value !== null) {
+    return
+  }
+  openingId.value = row.id
+  try {
+    const url = await authedBlobUrl(imageUrl(row.id))
+    window.open(url, '_blank', 'noopener')
+  } catch (err) {
+    message.error(err instanceof Error ? err.message : '原图加载失败')
+  } finally {
+    openingId.value = null
+  }
 }
 
 const columns: DataTableColumns<ImageSummary> = [
@@ -116,12 +130,11 @@ const columns: DataTableColumns<ImageSummary> = [
     key: 'thumbnail',
     width: 92,
     render: (row) =>
-      h(NImage, {
-        src: thumbnailUrl(row.id),
-        previewSrc: imageUrl(row.id),
+      h(AuthImage, {
+        url: thumbnailUrl(row.id),
+        previewUrl: imageUrl(row.id),
         width: 64,
         height: 64,
-        objectFit: 'cover',
         style: 'border-radius:4px;border:1px solid #dbe5f1;overflow:hidden',
       }),
   },
@@ -158,7 +171,15 @@ const columns: DataTableColumns<ImageSummary> = [
     fixed: 'right',
     render: (row) =>
       h('div', { style: 'display:flex;gap:8px' }, [
-        h(NButton, { size: 'small', onClick: () => openOriginal(row) }, { default: () => '原图' }),
+        h(
+          NButton,
+          {
+            size: 'small',
+            loading: openingId.value === row.id,
+            onClick: () => void openOriginal(row),
+          },
+          { default: () => '原图' },
+        ),
         h(
           NButton,
           { size: 'small', type: 'error', secondary: true, onClick: () => confirmDelete(row) },
