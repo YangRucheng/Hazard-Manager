@@ -4,18 +4,18 @@ import { useRouter } from 'vue-router'
 import {
   NButton,
   NCard,
-  NCascader,
   NDataTable,
   NDatePicker,
   NInput,
   NPagination,
   NSelect,
   NIcon,
+  NTag,
   useDialog,
   useMessage,
   type DataTableColumns,
-  type CascaderOption,
   type SelectOption,
+  type SelectGroupOption,
 } from 'naive-ui'
 import { AddOutline, RefreshOutline } from '@vicons/ionicons5'
 
@@ -37,7 +37,6 @@ interface Filters {
   status: HazardStatus | null
   level: HazardLevel | null
   typeId: number | null
-  categoryId: number | null
   unitId: number | null
   area: string
   keyword: string
@@ -55,13 +54,11 @@ const page = ref(1)
 const pageSize = ref(10)
 const units = ref<ResponsibleUnit[]>([])
 const types = ref<HazardType[]>([])
-const typePath = ref<number[]>([])
 
 const filters = ref<Filters>({
   status: null,
   level: null,
   typeId: null,
-  categoryId: null,
   unitId: null,
   area: '',
   keyword: '',
@@ -83,17 +80,22 @@ const unitOptions = computed<SelectOption[]>(() =>
   units.value.map((u) => ({ label: u.name, value: u.id })),
 )
 
-/** 将扁平类型数据组为级联选项（大类 -> 小类）。 */
-const typeOptions = computed<CascaderOption[]>(() =>
-  types.value
-    .filter((t) => t.parentId === 0)
-    .map((root) => {
-      const children = types.value
-        .filter((t) => t.parentId === root.id)
-        .map((c) => ({ label: c.name, value: c.id }))
-      return children.length > 0 ? { label: root.name, value: root.id, children } : { label: root.name, value: root.id }
-    }),
-)
+/** 类型筛选项：按大类分组，选择小类（= 组合行）即按该类型过滤。 */
+const typeOptions = computed<SelectGroupOption[]>(() => {
+  const groupMap = new Map<string, SelectOption[]>()
+  for (const t of types.value) {
+    if (!groupMap.has(t.major)) {
+      groupMap.set(t.major, [])
+    }
+    groupMap.get(t.major)!.push({ label: t.minor, value: t.id })
+  }
+  return [...groupMap.entries()].map(([label, options]) => ({
+    type: 'group',
+    label,
+    key: label,
+    options,
+  }))
+})
 
 async function loadUnits(): Promise<void> {
   const { data, error } = await client.GET('/units')
@@ -125,7 +127,6 @@ async function loadList(): Promise<void> {
           status: f.status ?? undefined,
           level: f.level ?? undefined,
           typeId: f.typeId ?? undefined,
-          categoryId: f.categoryId ?? undefined,
           unitId: f.unitId ?? undefined,
           area: f.area || undefined,
           keyword: f.keyword || undefined,
@@ -156,21 +157,7 @@ function handleSearch(): void {
 }
 
 function handleReset(): void {
-  filters.value = { status: null, level: null, typeId: null, categoryId: null, unitId: null, area: '', keyword: '', dateRange: null }
-  typePath.value = []
-  page.value = 1
-  void loadList()
-}
-
-/** 级联选中值（兼容 naive-ui：number[] | number | null 等）。 */
-type CascaderValue = number[] | string[] | number | string | null
-
-function handleTypeCascade(value: CascaderValue): void {
-  typePath.value = Array.isArray(value) ? (value as number[]) : []
-  const first = typePath.value[0]
-  const second = typePath.value[1]
-  filters.value.typeId = typeof first === 'number' ? first : null
-  filters.value.categoryId = typeof second === 'number' ? second : null
+  filters.value = { status: null, level: null, typeId: null, unitId: null, area: '', keyword: '', dateRange: null }
   page.value = 1
   void loadList()
 }
@@ -207,31 +194,26 @@ const columns: DataTableColumns<Hazard> = [
   { title: '区域', key: 'inspectionArea', width: 110, ellipsis: { tooltip: true } },
   { title: '隐患描述', key: 'description', minWidth: 200, ellipsis: { tooltip: true } },
   {
-    title: '类型 / 分类',
-    key: 'categoryName',
-    width: 130,
-    render: (row) => h('span', { class: 'type-cell' }, `${row.typeName} / ${row.categoryName}`),
+    title: '类型',
+    key: 'type',
+    width: 170,
+    render: (row) =>
+      h('span', { class: 'type-cell' }, `${row.typeMajor} / ${row.typeMinor}`),
   },
   { title: '责任单位', key: 'unitName', width: 110, ellipsis: { tooltip: true } },
   { title: '责任人', key: 'person', width: 80 },
-  {
-    title: '要求完成',
-    key: 'dueDate',
-    width: 105,
-    render: (row) => {
-      const overdue = isOverdue(row.dueDate, row.status)
-      return h('span', { style: overdue ? 'color:#d03050;font-weight:600' : undefined }, row.dueDate)
-    },
-  },
+  { title: '要求完成', key: 'dueDate', width: 105 },
   {
     title: '状态',
     key: 'status',
-    width: 96,
+    width: 130,
     render: (row) => {
       const overdue = isOverdue(row.dueDate, row.status)
       return h('div', { style: 'display:flex;align-items:center;gap:6px' }, [
         h(StatusTag, { status: row.status }),
-        overdue ? h('span', { style: 'color:#d03050;font-size:12px' }, '逾期') : null,
+        overdue
+          ? h(NTag, { type: 'error', size: 'small', bordered: false }, { default: () => '逾期' })
+          : null,
       ])
     },
   },
@@ -250,12 +232,16 @@ const columns: DataTableColumns<Hazard> = [
   {
     title: '操作',
     key: 'actions',
-    width: 110,
+    width: 140,
     fixed: 'right',
     render: (row) =>
-      h('div', { style: 'display:flex;gap:4px' }, [
-        h(NButton, { size: 'small', text: true, type: 'primary', onClick: () => goEdit(row.id) }, { default: () => '编辑' }),
-        h(NButton, { size: 'small', text: true, type: 'error', onClick: () => confirmDelete(row) }, { default: () => '删除' }),
+      h('div', { style: 'display:flex;gap:8px' }, [
+        h(NButton, { size: 'small', onClick: () => goEdit(row.id) }, { default: () => '编辑' }),
+        h(
+          NButton,
+          { size: 'small', type: 'error', secondary: true, onClick: () => confirmDelete(row) },
+          { default: () => '删除' },
+        ),
       ]),
   },
 ]
@@ -271,13 +257,14 @@ onMounted(() => {
   <div class="page">
     <n-card :bordered="true" class="filter-card">
       <div class="page-toolbar">
-        <n-cascader
-          v-model:value="typePath"
+        <n-select
+          v-model:value="filters.typeId"
           :options="typeOptions"
-          placeholder="隐患类型 / 分类"
+          placeholder="隐患类型"
           clearable
-          style="width: 190px"
-          @update:value="handleTypeCascade"
+          filterable
+          style="width: 200px"
+          @update:value="handleSearch"
         />
         <n-select
           v-model:value="filters.status"
@@ -343,7 +330,7 @@ onMounted(() => {
         :loading="loading"
         :bordered="false"
         :row-key="(row: Hazard) => row.id"
-        :scroll-x="1400"
+        :scroll-x="1500"
         size="small"
       />
       <div class="pager">
@@ -373,7 +360,7 @@ onMounted(() => {
 
 .pager-total {
   font-size: 13px;
-  color: #6b7a90;
+  color: #1f2937;
 }
 
 .type-cell {

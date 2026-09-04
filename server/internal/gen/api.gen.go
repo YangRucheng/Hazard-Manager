@@ -30,24 +30,6 @@ const (
 	HazardStatusN2    HazardStatus = "已整改"
 )
 
-// Defines values for HazardTypeStatus.
-const (
-	HazardTypeStatusN0 HazardTypeStatus = 0
-	HazardTypeStatusN1 HazardTypeStatus = 1
-)
-
-// Defines values for HazardTypeCreateRequestStatus.
-const (
-	HazardTypeCreateRequestStatusN0 HazardTypeCreateRequestStatus = 0
-	HazardTypeCreateRequestStatusN1 HazardTypeCreateRequestStatus = 1
-)
-
-// Defines values for HazardTypeUpdateRequestStatus.
-const (
-	HazardTypeUpdateRequestStatusN0 HazardTypeUpdateRequestStatus = 0
-	HazardTypeUpdateRequestStatusN1 HazardTypeUpdateRequestStatus = 1
-)
-
 // Defines values for ResponsibleUnitStatus.
 const (
 	ResponsibleUnitStatusN0 ResponsibleUnitStatus = 0
@@ -62,8 +44,8 @@ const (
 
 // Defines values for UnitUpdateRequestStatus.
 const (
-	UnitUpdateRequestStatusN0 UnitUpdateRequestStatus = 0
-	UnitUpdateRequestStatusN1 UnitUpdateRequestStatus = 1
+	N0 UnitUpdateRequestStatus = 0
+	N1 UnitUpdateRequestStatus = 1
 )
 
 // Defines values for UserInfoUserType.
@@ -88,13 +70,7 @@ type Hazard struct {
 
 	// BeforeImageIds 整改前图片 uuid 列表
 	BeforeImageIds *[]string `json:"beforeImageIds,omitempty"`
-
-	// CategoryId 隐患分类（小类）id
-	CategoryId int64 `json:"categoryId"`
-
-	// CategoryName 隐患分类名称
-	CategoryName string    `json:"categoryName"`
-	CreatedAt    time.Time `json:"createdAt"`
+	CreatedAt      time.Time `json:"createdAt"`
 
 	// Description 隐患描述
 	Description string `json:"description"`
@@ -124,11 +100,14 @@ type Hazard struct {
 	// Suggestion 建议整改方案
 	Suggestion *string `json:"suggestion"`
 
-	// TypeId 隐患类型（大类）id
+	// TypeId 隐患类型 id（=「大类+小类」组合行 id）
 	TypeId int64 `json:"typeId"`
 
-	// TypeName 隐患类型名称
-	TypeName string `json:"typeName"`
+	// TypeMajor 隐患类型大类名称（JOIN 返回）
+	TypeMajor string `json:"typeMajor"`
+
+	// TypeMinor 隐患类型小类名称（JOIN 返回）
+	TypeMinor string `json:"typeMinor"`
 
 	// UnitId 责任单位 id
 	UnitId int64 `json:"unitId"`
@@ -142,9 +121,6 @@ type Hazard struct {
 type HazardCreateRequest struct {
 	AfterImageIds  *[]string `json:"afterImageIds,omitempty"`
 	BeforeImageIds *[]string `json:"beforeImageIds,omitempty"`
-
-	// CategoryId 隐患分类（小类）id（必填，须属于 typeId）
-	CategoryId int64 `json:"categoryId"`
 
 	// Description 隐患描述（必填）
 	Description string `json:"description"`
@@ -164,7 +140,7 @@ type HazardCreateRequest struct {
 	Status        *HazardStatus `json:"status,omitempty"`
 	Suggestion    *string       `json:"suggestion"`
 
-	// TypeId 隐患类型（大类）id（必填）
+	// TypeId 隐患类型组合行 id（必填，须已存在于 /hazard-types）
 	TypeId int64 `json:"typeId"`
 
 	// UnitId 责任单位 id（必填，责任人由此关联）
@@ -202,47 +178,34 @@ type HazardStatus string
 type HazardType struct {
 	CreatedAt time.Time `json:"createdAt"`
 	Id        int64     `json:"id"`
-	Name      string    `json:"name"`
 
-	// ParentId 0=大类（隐患类型）；>0=小类（隐患分类），指向大类 id
-	ParentId  int64            `json:"parentId"`
-	Sort      int              `json:"sort"`
-	Status    HazardTypeStatus `json:"status"`
-	UpdatedAt time.Time        `json:"updatedAt"`
+	// Major 大类（组内去重展示，也支持直接输入新大类）
+	Major string `json:"major"`
+
+	// Minor 小类
+	Minor     string    `json:"minor"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// HazardTypeStatus defines model for HazardType.Status.
-type HazardTypeStatus int
-
-// HazardTypeCreateRequest defines model for HazardTypeCreateRequest.
+// HazardTypeCreateRequest 每次新增需同时提供大类与小类；同一「大类+小类」组合唯一
 type HazardTypeCreateRequest struct {
-	Name string `json:"name"`
+	// Major 大类
+	Major string `json:"major"`
 
-	// ParentId 0=大类；>0 时须为已存在的大类 id
-	ParentId int64                          `json:"parentId"`
-	Sort     *int                           `json:"sort,omitempty"`
-	Status   *HazardTypeCreateRequestStatus `json:"status,omitempty"`
+	// Minor 小类
+	Minor string `json:"minor"`
 }
-
-// HazardTypeCreateRequestStatus defines model for HazardTypeCreateRequest.Status.
-type HazardTypeCreateRequestStatus int
 
 // HazardTypeUpdateRequest defines model for HazardTypeUpdateRequest.
 type HazardTypeUpdateRequest struct {
-	Name     *string                        `json:"name,omitempty"`
-	ParentId *int64                         `json:"parentId,omitempty"`
-	Sort     *int                           `json:"sort,omitempty"`
-	Status   *HazardTypeUpdateRequestStatus `json:"status,omitempty"`
+	Major *string `json:"major,omitempty"`
+	Minor *string `json:"minor,omitempty"`
 }
-
-// HazardTypeUpdateRequestStatus defines model for HazardTypeUpdateRequest.Status.
-type HazardTypeUpdateRequestStatus int
 
 // HazardUpdateRequest 全部字段可选，仅更新提供的字段
 type HazardUpdateRequest struct {
 	AfterImageIds  *[]string           `json:"afterImageIds,omitempty"`
 	BeforeImageIds *[]string           `json:"beforeImageIds,omitempty"`
-	CategoryId     *int64              `json:"categoryId,omitempty"`
 	Description    *string             `json:"description,omitempty"`
 	DueDate        *openapi_types.Date `json:"dueDate,omitempty"`
 	InspectionArea *string             `json:"inspectionArea,omitempty"`
@@ -253,8 +216,10 @@ type HazardUpdateRequest struct {
 	Remark         *string             `json:"remark"`
 	Status         *HazardStatus       `json:"status,omitempty"`
 	Suggestion     *string             `json:"suggestion"`
-	TypeId         *int64              `json:"typeId,omitempty"`
-	UnitId         *int64              `json:"unitId,omitempty"`
+
+	// TypeId 隐患类型组合行 id
+	TypeId *int64 `json:"typeId,omitempty"`
+	UnitId *int64 `json:"unitId,omitempty"`
 }
 
 // ImageInfo defines model for ImageInfo.
@@ -378,14 +343,15 @@ type Unprocessable = Error
 
 // ListHazardsParams defines parameters for ListHazards.
 type ListHazardsParams struct {
-	Page       *int          `form:"page,omitempty" json:"page,omitempty"`
-	PageSize   *int          `form:"pageSize,omitempty" json:"pageSize,omitempty"`
-	Status     *HazardStatus `form:"status,omitempty" json:"status,omitempty"`
-	Level      *HazardLevel  `form:"level,omitempty" json:"level,omitempty"`
-	TypeId     *int64        `form:"typeId,omitempty" json:"typeId,omitempty"`
-	CategoryId *int64        `form:"categoryId,omitempty" json:"categoryId,omitempty"`
-	UnitId     *int64        `form:"unitId,omitempty" json:"unitId,omitempty"`
-	Area       *string       `form:"area,omitempty" json:"area,omitempty"`
+	Page     *int          `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int          `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+	Status   *HazardStatus `form:"status,omitempty" json:"status,omitempty"`
+	Level    *HazardLevel  `form:"level,omitempty" json:"level,omitempty"`
+
+	// TypeId 隐患类型组合行 id（按大类/小类过滤，需先查 /hazard-types 得到行 id）
+	TypeId *int64  `form:"typeId,omitempty" json:"typeId,omitempty"`
+	UnitId *int64  `form:"unitId,omitempty" json:"unitId,omitempty"`
+	Area   *string `form:"area,omitempty" json:"area,omitempty"`
 
 	// Keyword 模糊匹配 隐患描述/建议整改方案/备注/检查区域/检查人员/责任人
 	Keyword *string `form:"keyword,omitempty" json:"keyword,omitempty"`
@@ -440,16 +406,16 @@ type ServerInterface interface {
 	// 当前登录用户信息（用于校验 token 有效性）
 	// (GET /auth/me)
 	GetCurrentUser(c *gin.Context)
-	// 隐患类型/分类全量（扁平，含两级，前端组树）
+	// 隐患类型全量（每行一个「大类+小类」组合，前端按大类分组展示）
 	// (GET /hazard-types)
 	ListHazardTypes(c *gin.Context)
-	// 新增隐患类型（parentId=0）或分类（parentId=大类id）
+	// 新增隐患类型（需同时填大类与小类，同一组合唯一）
 	// (POST /hazard-types)
 	CreateHazardType(c *gin.Context)
-	// 删除隐患类型/分类（存在子分类或被隐患引用时拒绝）
+	// 删除隐患类型（被隐患引用的类型拒绝删除）
 	// (DELETE /hazard-types/{id})
 	DeleteHazardType(c *gin.Context, id int64)
-	// 更新隐患类型/分类
+	// 更新隐患类型（被引用的类型只允许修改、不允许删除）
 	// (PUT /hazard-types/{id})
 	UpdateHazardType(c *gin.Context, id int64)
 	// 隐患记录分页列表（含筛选）
@@ -659,14 +625,6 @@ func (siw *ServerInterfaceWrapper) ListHazards(c *gin.Context) {
 	err = runtime.BindQueryParameter("form", true, false, "typeId", c.Request.URL.Query(), &params.TypeId)
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter typeId: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "categoryId" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "categoryId", c.Request.URL.Query(), &params.CategoryId)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter categoryId: %w", err), http.StatusBadRequest)
 		return
 	}
 

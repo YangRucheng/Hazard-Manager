@@ -19,7 +19,8 @@ import (
 // setupIntegration 初始化集成测试环境。
 // 用法：export TEST_DB_DSN='hazard:hazard_dev_password@tcp(127.0.0.1:3306)/hazard_system_test?charset=utf8mb4&parseTime=True&loc=Local'
 // 需先创建测试库：CREATE DATABASE hazard_system_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-func setupIntegration(t *testing.T) *HazardService {
+// 返回 service 与一个按「大类+小类」取 seed 类型 id 的函数。
+func setupIntegration(t *testing.T) (*HazardService, func(major, minor string) int64) {
 	t.Helper()
 	dsn := os.Getenv("TEST_DB_DSN")
 	if dsn == "" {
@@ -30,12 +31,25 @@ func setupIntegration(t *testing.T) *HazardService {
 	resetTables(t, db)
 	require.NoError(t, database.SeedIfEmpty(db))
 
+	typeLookup := func(major, minor string) int64 {
+		t.Helper()
+		items, err := repo.NewHazardTypeRepo(db).List()
+		require.NoError(t, err)
+		for i := range items {
+			if items[i].Major == major && items[i].Minor == minor {
+				return int64(items[i].ID)
+			}
+		}
+		t.Fatalf("seed 中不存在类型「%s / %s」", major, minor)
+		return 0
+	}
+
 	return NewHazardService(
 		repo.NewHazardRepo(db),
 		repo.NewUnitRepo(db),
 		repo.NewHazardTypeRepo(db),
 		repo.NewImageRepo(db),
-	)
+	), typeLookup
 }
 
 func resetTables(t *testing.T, db *gorm.DB) {
@@ -47,13 +61,12 @@ func resetTables(t *testing.T, db *gorm.DB) {
 }
 
 func TestCreate_DefaultsAndLinkage(t *testing.T) {
-	svc := setupIntegration(t)
+	svc, typeID := setupIntegration(t)
 
 	h, appErr := svc.Create(gen.HazardCreateRequest{
 		Description: "测试隐患：线路裸露",
 		UnitId:      1, // seed 中 id=1 为电气车间/张三
-		TypeId:      1,
-		CategoryId:  3,
+		TypeId:      typeID("电气设备", "线路老化"),
 	})
 	require.Nil(t, appErr)
 	require.NotNil(t, h)
@@ -65,7 +78,8 @@ func TestCreate_DefaultsAndLinkage(t *testing.T) {
 	assert.Equal(t, gen.HazardStatus(model.StatusPending), h.Status)
 	assert.Equal(t, gen.HazardLevel(model.LevelGeneral), h.Level)
 	assert.Equal(t, "张三", h.Person) // 单位联动
-	assert.Equal(t, "电气设备", h.TypeName)
+	assert.Equal(t, "电气设备", h.TypeMajor)
+	assert.Equal(t, "线路老化", h.TypeMinor)
 
 	// 检查日期=今天，要求完成时间=检查日期+7 天。
 	inspection := h.InspectionDate.Time
@@ -74,7 +88,7 @@ func TestCreate_DefaultsAndLinkage(t *testing.T) {
 }
 
 func TestCreate_RespectsProvidedValues(t *testing.T) {
-	svc := setupIntegration(t)
+	svc, typeID := setupIntegration(t)
 	date := types.Date{Time: parseTime("2026-08-20")}
 	due := types.Date{Time: parseTime("2026-08-30")}
 	recheck := "远程复核"
@@ -89,8 +103,7 @@ func TestCreate_RespectsProvidedValues(t *testing.T) {
 		Level:          levelPtr("重大隐患"),
 		Description:    "测试隐患：给定值",
 		UnitId:         2,
-		TypeId:         1,
-		CategoryId:     3,
+		TypeId:         typeID("电气设备", "绝缘破损"),
 	})
 	require.Nil(t, appErr)
 	assert.Equal(t, "二号车间", h.InspectionArea)
@@ -104,37 +117,34 @@ func TestCreate_RespectsProvidedValues(t *testing.T) {
 	assert.Equal(t, "李四", h.Person)
 }
 
-func TestCreate_CategoryMustBelongToType(t *testing.T) {
-	svc := setupIntegration(t)
+func TestCreate_TypeMustExist(t *testing.T) {
+	svc, _ := setupIntegration(t)
 	_, appErr := svc.Create(gen.HazardCreateRequest{
-		Description: "分类不匹配",
+		Description: "类型不存在",
 		UnitId:      1,
-		TypeId:      1, // 电气设备
-		CategoryId:  6, // 警示标识缺失 属于 安全防护(2)
+		TypeId:      99999,
 	})
 	require.NotNil(t, appErr)
 	assert.Equal(t, 422, appErr.Status)
 }
 
 func TestCreate_UnitMustExist(t *testing.T) {
-	svc := setupIntegration(t)
+	svc, typeID := setupIntegration(t)
 	_, appErr := svc.Create(gen.HazardCreateRequest{
 		Description: "单位不存在",
 		UnitId:      99999,
-		TypeId:      1,
-		CategoryId:  3,
+		TypeId:      typeID("电气设备", "线路老化"),
 	})
 	require.NotNil(t, appErr)
 	assert.Equal(t, 422, appErr.Status)
 }
 
 func TestCreate_InvalidStatusRejected(t *testing.T) {
-	svc := setupIntegration(t)
+	svc, typeID := setupIntegration(t)
 	_, appErr := svc.Create(gen.HazardCreateRequest{
 		Description: "非法状态",
 		UnitId:      1,
-		TypeId:      1,
-		CategoryId:  3,
+		TypeId:      typeID("电气设备", "线路老化"),
 		Status:      statusPtr("已废弃"),
 	})
 	require.NotNil(t, appErr)
@@ -142,12 +152,11 @@ func TestCreate_InvalidStatusRejected(t *testing.T) {
 }
 
 func TestUpdate_UnitChangeRelinksPerson(t *testing.T) {
-	svc := setupIntegration(t)
+	svc, typeID := setupIntegration(t)
 	created, appErr := svc.Create(gen.HazardCreateRequest{
 		Description: "联动测试",
 		UnitId:      1,
-		TypeId:      1,
-		CategoryId:  3,
+		TypeId:      typeID("电气设备", "线路老化"),
 	})
 	require.Nil(t, appErr)
 
@@ -159,16 +168,16 @@ func TestUpdate_UnitChangeRelinksPerson(t *testing.T) {
 }
 
 func TestUpdate_NotFound(t *testing.T) {
-	svc := setupIntegration(t)
+	svc, _ := setupIntegration(t)
 	_, appErr := svc.Update(999999, gen.HazardUpdateRequest{})
 	require.NotNil(t, appErr)
 	assert.Equal(t, 404, appErr.Status)
 }
 
 func TestStats_AfterCreate(t *testing.T) {
-	svc := setupIntegration(t)
+	svc, typeID := setupIntegration(t)
 	_, appErr := svc.Create(gen.HazardCreateRequest{
-		Description: "统计测试", UnitId: 1, TypeId: 1, CategoryId: 3,
+		Description: "统计测试", UnitId: 1, TypeId: typeID("电气设备", "线路老化"),
 	})
 	require.Nil(t, appErr)
 

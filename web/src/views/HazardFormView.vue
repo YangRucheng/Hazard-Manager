@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   NButton,
   NCard,
-  NCascader,
   NDatePicker,
   NForm,
   NFormItem,
@@ -15,8 +14,8 @@ import {
   useMessage,
   type FormInst,
   type FormRules,
-  type CascaderOption,
   type SelectOption,
+  type SelectGroupOption,
 } from 'naive-ui'
 
 import { client, errorMessage } from '@/api/client'
@@ -41,7 +40,7 @@ interface FormModel {
   beforeImageIds: string[]
   status: HazardStatus
   afterImageIds: string[]
-  typePath: number[]
+  typeId: number | null
   level: HazardLevel
   remark: string
 }
@@ -73,21 +72,27 @@ const form = ref<FormModel>({
   beforeImageIds: [],
   status: '待整改',
   afterImageIds: [],
-  typePath: [],
+  typeId: null,
   level: '一般隐患',
   remark: '',
 })
 
-const typeOptions = computed<CascaderOption[]>(() =>
-  types.value
-    .filter((t) => t.parentId === 0)
-    .map((root) => {
-      const children = types.value
-        .filter((t) => t.parentId === root.id)
-        .map((c) => ({ label: c.name, value: c.id }))
-      return children.length > 0 ? { label: root.name, value: root.id, children } : { label: root.name, value: root.id }
-    }),
-)
+/** 类型选项：按大类分组展示小类，选项值即「大类+小类」组合行 id。 */
+const typeOptions = computed<SelectGroupOption[]>(() => {
+  const groupMap = new Map<string, SelectOption[]>()
+  for (const t of types.value) {
+    if (!groupMap.has(t.major)) {
+      groupMap.set(t.major, [])
+    }
+    groupMap.get(t.major)!.push({ label: t.minor, value: t.id })
+  }
+  return [...groupMap.entries()].map(([label, options]) => ({
+    type: 'group',
+    label,
+    key: label,
+    options,
+  }))
+})
 
 const unitOptions = computed<SelectOption[]>(() =>
   units.value.map((u) => ({ label: u.name, value: u.id })),
@@ -116,11 +121,7 @@ const rules: FormRules = {
     { min: 2, message: '隐患描述至少 2 个字符', trigger: ['input', 'blur'] },
   ],
   unitId: { required: true, type: 'number', message: '请选择责任单位', trigger: ['change'] },
-  typePath: {
-    required: true,
-    validator: () => (form.value.typePath.length === 2 ? true : new Error('请选择隐患类型与分类')),
-    trigger: ['change'],
-  },
+  typeId: { required: true, type: 'number', message: '请选择隐患类型', trigger: ['change'] },
 }
 
 async function loadEnums(): Promise<void> {
@@ -168,7 +169,7 @@ function applyDetail(h: Hazard): void {
     beforeImageIds: h.beforeImageIds ?? [],
     status: h.status,
     afterImageIds: h.afterImageIds ?? [],
-    typePath: [h.typeId, h.categoryId],
+    typeId: h.typeId,
     level: h.level,
     remark: h.remark ?? '',
   }
@@ -200,11 +201,8 @@ async function handleSubmit(): Promise<void> {
     message.warning('请完善表单必填项')
     return
   }
-
-  const typeId = form.value.typePath[0]
-  const categoryId = form.value.typePath[1]
-  if (typeof typeId !== 'number' || typeof categoryId !== 'number') {
-    message.warning('请选择隐患类型与分类')
+  if (form.value.typeId === null) {
+    message.warning('请选择隐患类型')
     return
   }
 
@@ -222,8 +220,7 @@ async function handleSubmit(): Promise<void> {
       beforeImageIds: form.value.beforeImageIds,
       status: form.value.status,
       afterImageIds: form.value.afterImageIds,
-      typeId,
-      categoryId,
+      typeId: form.value.typeId,
       level: form.value.level,
       remark: form.value.remark.trim() || null,
     }
@@ -370,12 +367,13 @@ onMounted(() => {
             </n-form-item>
           </n-grid-item>
           <n-grid-item>
-            <n-form-item label="类型 / 分类" path="typePath">
-              <n-cascader
-                v-model:value="form.typePath"
+            <n-form-item label="隐患类型" path="typeId">
+              <n-select
+                v-model:value="form.typeId"
                 :options="typeOptions"
-                placeholder="先选类型，再选分类"
-                check-strategy="child"
+                placeholder="先选大类，再选小类"
+                filterable
+                clearable
                 style="width: 100%"
               />
             </n-form-item>

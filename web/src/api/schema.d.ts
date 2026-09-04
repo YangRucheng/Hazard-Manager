@@ -135,10 +135,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 隐患类型/分类全量（扁平，含两级，前端组树） */
+        /** 隐患类型全量（每行一个「大类+小类」组合，前端按大类分组展示） */
         get: operations["listHazardTypes"];
         put?: never;
-        /** 新增隐患类型（parentId=0）或分类（parentId=大类id） */
+        /** 新增隐患类型（需同时填大类与小类，同一组合唯一） */
         post: operations["createHazardType"];
         delete?: never;
         options?: never;
@@ -154,10 +154,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** 更新隐患类型/分类 */
+        /** 更新隐患类型（被引用的类型只允许修改、不允许删除） */
         put: operations["updateHazardType"];
         post?: never;
-        /** 删除隐患类型/分类（存在子分类或被隐患引用时拒绝） */
+        /** 删除隐患类型（被隐患引用的类型拒绝删除） */
         delete: operations["deleteHazardType"];
         options?: never;
         head?: never;
@@ -290,18 +290,13 @@ export interface components {
             afterImageIds?: string[];
             /**
              * Format: int64
-             * @description 隐患类型（大类）id
+             * @description 隐患类型 id（=「大类+小类」组合行 id）
              */
             typeId: number;
-            /** @description 隐患类型名称 */
-            typeName: string;
-            /**
-             * Format: int64
-             * @description 隐患分类（小类）id
-             */
-            categoryId: number;
-            /** @description 隐患分类名称 */
-            categoryName: string;
+            /** @description 隐患类型大类名称（JOIN 返回） */
+            typeMajor: string;
+            /** @description 隐患类型小类名称（JOIN 返回） */
+            typeMinor: string;
             level: components["schemas"]["HazardLevel"];
             remark?: string | null;
             /** Format: date-time */
@@ -340,14 +335,9 @@ export interface components {
             afterImageIds?: string[];
             /**
              * Format: int64
-             * @description 隐患类型（大类）id（必填）
+             * @description 隐患类型组合行 id（必填，须已存在于 /hazard-types）
              */
             typeId: number;
-            /**
-             * Format: int64
-             * @description 隐患分类（小类）id（必填，须属于 typeId）
-             */
-            categoryId: number;
             /** @default 一般隐患 */
             level: components["schemas"]["HazardLevel"];
             remark?: string | null;
@@ -368,10 +358,11 @@ export interface components {
             beforeImageIds?: string[];
             status?: components["schemas"]["HazardStatus"];
             afterImageIds?: string[];
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description 隐患类型组合行 id
+             */
             typeId?: number;
-            /** Format: int64 */
-            categoryId?: number;
             level?: components["schemas"]["HazardLevel"];
             remark?: string | null;
         };
@@ -443,42 +434,25 @@ export interface components {
         HazardType: {
             /** Format: int64 */
             id: number;
-            /**
-             * Format: int64
-             * @description 0=大类（隐患类型）；>0=小类（隐患分类），指向大类 id
-             */
-            parentId: number;
-            name: string;
-            sort: number;
-            /** @enum {integer} */
-            status: 0 | 1;
+            /** @description 大类（组内去重展示，也支持直接输入新大类） */
+            major: string;
+            /** @description 小类 */
+            minor: string;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
         };
+        /** @description 每次新增需同时提供大类与小类；同一「大类+小类」组合唯一 */
         HazardTypeCreateRequest: {
-            /**
-             * Format: int64
-             * @description 0=大类；>0 时须为已存在的大类 id
-             */
-            parentId: number;
-            name: string;
-            /** @default 0 */
-            sort: number;
-            /**
-             * @default 1
-             * @enum {integer}
-             */
-            status: 0 | 1;
+            /** @description 大类 */
+            major: string;
+            /** @description 小类 */
+            minor: string;
         };
         HazardTypeUpdateRequest: {
-            /** Format: int64 */
-            parentId?: number;
-            name?: string;
-            sort?: number;
-            /** @enum {integer} */
-            status?: 0 | 1;
+            major?: string;
+            minor?: string;
         };
         ImageInfo: {
             /** @description uuid（32 位十六进制，其他表只存此值） */
@@ -608,8 +582,8 @@ export interface operations {
                 pageSize?: number;
                 status?: components["schemas"]["HazardStatus"];
                 level?: components["schemas"]["HazardLevel"];
+                /** @description 隐患类型组合行 id（按大类/小类过滤，需先查 /hazard-types 得到行 id） */
                 typeId?: number;
-                categoryId?: number;
                 unitId?: number;
                 area?: string;
                 /** @description 模糊匹配 隐患描述/建议整改方案/备注/检查区域/检查人员/责任人 */

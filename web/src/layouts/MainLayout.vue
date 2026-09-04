@@ -141,8 +141,8 @@ function handleLogout(): void {
 }
 
 .brand-sub {
-  font-size: 11px;
-  color: #8a97ab;
+  font-size: 12px;
+  color: #5a7fd0;
   letter-spacing: 0.4px;
 }
 

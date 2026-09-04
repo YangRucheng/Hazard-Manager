@@ -32,15 +32,14 @@ func NewHazardService(hazards *repo.HazardRepo, units *repo.UnitRepo, types *rep
 // List 分页查询并转换为响应 DTO。
 func (s *HazardService) List(params gen.ListHazardsParams) (*gen.HazardListResponse, *Error) {
 	filter := repo.HazardFilter{
-		Status:     optionalString(params.Status),
-		Level:      optionalString(params.Level),
-		TypeID:     optionalUint64(params.TypeId),
-		CategoryID: optionalUint64(params.CategoryId),
-		UnitID:     optionalUint64(params.UnitId),
-		Area:       params.Area,
-		Keyword:    params.Keyword,
-		Page:       derefInt(params.Page, 1),
-		PageSize:   derefInt(params.PageSize, 20),
+		Status:   optionalString(params.Status),
+		Level:    optionalString(params.Level),
+		TypeID:   optionalUint64(params.TypeId),
+		UnitID:   optionalUint64(params.UnitId),
+		Area:     params.Area,
+		Keyword:  params.Keyword,
+		Page:     derefInt(params.Page, 1),
+		PageSize: derefInt(params.PageSize, 20),
 	}
 	if params.DateFrom != nil {
 		v := (*params.DateFrom).Time.Format("2006-01-02")
@@ -91,8 +90,8 @@ func (s *HazardService) Create(req gen.HazardCreateRequest) (*gen.Hazard, *Error
 	if req.UnitId <= 0 {
 		return nil, Unprocessable("请选择责任单位")
 	}
-	if req.TypeId <= 0 || req.CategoryId <= 0 {
-		return nil, Unprocessable("请选择隐患类型与分类")
+	if req.TypeId <= 0 {
+		return nil, Unprocessable("请选择隐患类型")
 	}
 
 	h := &model.Hazard{
@@ -166,26 +165,15 @@ func (s *HazardService) Create(req gen.HazardCreateRequest) (*gen.Hazard, *Error
 		return nil, Unprocessable("责任单位「" + unit.Name + "」未配置责任人")
 	}
 
-	// 类型/分类：小类必须属于所选大类。
+	// 隐患类型：须为已存在的类型组合行。
 	typeRow, typeErr := s.types.GetByID(uint64(req.TypeId))
-	categoryRow, catErr := s.types.GetByID(uint64(req.CategoryId))
-	if typeErr == repo.ErrNotFound || catErr == repo.ErrNotFound {
-		return nil, Unprocessable("隐患类型或分类不存在")
+	if typeErr == repo.ErrNotFound {
+		return nil, Unprocessable("隐患类型不存在")
 	}
-	if typeErr != nil || catErr != nil {
-		if typeErr != nil {
-			return nil, Internal(typeErr)
-		}
-		return nil, Internal(catErr)
-	}
-	if typeRow.ParentID != 0 {
-		return nil, Unprocessable("所选「隐患类型」不是大类")
-	}
-	if categoryRow.ParentID != typeRow.ID {
-		return nil, Unprocessable("隐患分类「" + categoryRow.Name + "」不属于所选类型「" + typeRow.Name + "」")
+	if typeErr != nil {
+		return nil, Internal(typeErr)
 	}
 	h.TypeID = typeRow.ID
-	h.CategoryID = categoryRow.ID
 
 	// 图片 uuid 校验。
 	before, after, imgErr := s.validateImages(req.BeforeImageIds, req.AfterImageIds)
@@ -283,22 +271,16 @@ func (s *HazardService) Update(id int64, req gen.HazardUpdateRequest) (*gen.Haza
 		h.Person = strings.TrimSpace(unit.Person)
 	}
 
-	// 类型/分类变更 -> 校验归属。
-	if req.TypeId != nil || req.CategoryId != nil {
-		newTypeID := h.TypeID
-		if req.TypeId != nil {
-			newTypeID = uint64(*req.TypeId)
+	// 隐患类型变更 -> 校验存在性。
+	if req.TypeId != nil {
+		newTypeID := uint64(*req.TypeId)
+		if newTypeID <= 0 {
+			return nil, Unprocessable("请选择隐患类型")
 		}
-		newCategoryID := h.CategoryID
-		if req.CategoryId != nil {
-			newCategoryID = uint64(*req.CategoryId)
-		}
-		validateErr := s.validateTypeCategory(newTypeID, newCategoryID)
-		if validateErr != nil {
+		if validateErr := s.validateType(newTypeID); validateErr != nil {
 			return nil, validateErr
 		}
 		h.TypeID = newTypeID
-		h.CategoryID = newCategoryID
 	}
 
 	// 图片变更。
@@ -402,24 +384,12 @@ func (s *HazardService) validateImageStrings(before, after string) (string, stri
 	return before, after, nil
 }
 
-// validateTypeCategory 校验大类/小类归属。
-func (s *HazardService) validateTypeCategory(typeID, categoryID uint64) *Error {
-	typeRow, typeErr := s.types.GetByID(typeID)
-	categoryRow, catErr := s.types.GetByID(categoryID)
-	if typeErr == repo.ErrNotFound || catErr == repo.ErrNotFound {
-		return Unprocessable("隐患类型或分类不存在")
-	}
-	if typeErr != nil {
-		return Internal(typeErr)
-	}
-	if catErr != nil {
-		return Internal(catErr)
-	}
-	if typeRow.ParentID != 0 {
-		return Unprocessable("所选「隐患类型」不是大类")
-	}
-	if categoryRow.ParentID != typeRow.ID {
-		return Unprocessable("隐患分类「" + categoryRow.Name + "」不属于所选类型「" + typeRow.Name + "」")
+// validateType 校验隐患类型组合行存在。
+func (s *HazardService) validateType(typeID uint64) *Error {
+	if _, err := s.types.GetByID(typeID); err == repo.ErrNotFound {
+		return Unprocessable("隐患类型不存在")
+	} else if err != nil {
+		return Internal(err)
 	}
 	return nil
 }
@@ -440,9 +410,8 @@ func toGenHazard(h *model.Hazard) gen.Hazard {
 		RecheckPerson:  h.RecheckPerson,
 		Status:         gen.HazardStatus(h.Status),
 		TypeId:         int64(h.TypeID),
-		TypeName:       h.TypeName,
-		CategoryId:     int64(h.CategoryID),
-		CategoryName:   h.CategoryName,
+		TypeMajor:      h.TypeMajor,
+		TypeMinor:      h.TypeMinor,
 		Level:          gen.HazardLevel(h.Level),
 		Remark:         h.Remark,
 		CreatedAt:      h.CreatedAt,

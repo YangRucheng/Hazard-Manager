@@ -32,23 +32,16 @@ func SeedIfEmpty(db *gorm.DB) error {
 	}
 	if typeCount == 0 {
 		types := []model.HazardType{
-			{ParentID: 0, Name: "电气设备", Sort: 1, Status: 1},
-			{ParentID: 0, Name: "安全防护", Sort: 2, Status: 1},
+			{Major: "电气设备", Minor: "线路老化"},
+			{Major: "电气设备", Minor: "接线不规范"},
+			{Major: "电气设备", Minor: "绝缘破损"},
+			{Major: "安全防护", Minor: "警示标识缺失"},
+			{Major: "安全防护", Minor: "防护罩缺失"},
 		}
 		if err := db.Create(&types).Error; err != nil {
 			return err
 		}
-		categories := []model.HazardType{
-			{ParentID: types[0].ID, Name: "线路老化", Sort: 1, Status: 1},
-			{ParentID: types[0].ID, Name: "接线不规范", Sort: 2, Status: 1},
-			{ParentID: types[0].ID, Name: "绝缘破损", Sort: 3, Status: 1},
-			{ParentID: types[1].ID, Name: "警示标识缺失", Sort: 1, Status: 1},
-			{ParentID: types[1].ID, Name: "防护罩缺失", Sort: 2, Status: 1},
-		}
-		if err := db.Create(&categories).Error; err != nil {
-			return err
-		}
-		log.Printf("已写入示例隐患类型 %d 条、分类 %d 条", len(types), len(categories))
+		log.Printf("已写入示例隐患类型 %d 条", len(types))
 	}
 	return nil
 }
