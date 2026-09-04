@@ -21,8 +21,13 @@ type HealthResponse struct {
 // 鉴权策略：仅 POST /api/v1/auth/login 公开，其余 /api/v1/* 均需有效 JWT 且 user_type=admin。
 func NewRouter(srv *handler.Server, am *auth.Manager) *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery())
+	r.Use(gin.Logger(), recoveryMiddleware())
 	r.Use(corsMiddleware())
+
+	// 框架兜底：404（未知路由）/ 405（方法不允许）统一输出 JSON 而非纯文本。
+	r.HandleMethodNotAllowed = true
+	r.NoRoute(noRouteHandler)
+	r.NoMethod(noMethodHandler)
 
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, HealthResponse{Status: "ok"})
@@ -32,7 +37,11 @@ func NewRouter(srv *handler.Server, am *auth.Manager) *gin.Engine {
 	api.Use(apiAuthMiddleware(am))
 
 	// 全部端点注册（含 login，login 在 apiAuthMiddleware 中放行）。
-	gen.RegisterHandlersWithOptions(api, srv, gen.GinServerOptions{BaseURL: ""})
+	// ErrorHandler 兜住 oapi-codegen 的参数解析错误，输出统一 JSON。
+	gen.RegisterHandlersWithOptions(api, srv, gen.GinServerOptions{
+		BaseURL:      "",
+		ErrorHandler: oapiErrorHandler,
+	})
 
 	return r
 }
