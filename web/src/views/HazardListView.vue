@@ -9,7 +9,6 @@ import {
   NInput,
   NPagination,
   NSelect,
-  NIcon,
   NTag,
   useDialog,
   useMessage,
@@ -17,7 +16,6 @@ import {
   type SelectOption,
   type SelectGroupOption,
 } from 'naive-ui'
-import { AddOutline, RefreshOutline } from '@vicons/ionicons5'
 
 import { client, errorMessage } from '@/api/client'
 import StatusTag from '@/components/StatusTag.vue'
@@ -257,77 +255,102 @@ onMounted(() => {
 
 <template>
   <div class="page">
-    <n-card :bordered="true" class="filter-card">
-      <div class="page-toolbar filter-toolbar">
-        <n-select
-          v-model:value="filters.typeId"
-          :options="typeOptions"
-          placeholder="隐患类型"
-          clearable
-          filterable
-          class="f-ctl f-w200"
-          @update:value="handleSearch"
-        />
-        <n-select
-          v-model:value="filters.status"
-          :options="statusOptions"
-          placeholder="整改状态"
-          clearable
-          class="f-ctl f-w130"
-          @update:value="handleSearch"
-        />
-        <n-select
-          v-model:value="filters.level"
-          :options="levelOptions"
-          placeholder="隐患等级"
-          clearable
-          class="f-ctl f-w130"
-          @update:value="handleSearch"
-        />
-        <n-select
-          v-model:value="filters.unitId"
-          :options="unitOptions"
-          placeholder="责任单位"
-          clearable
-          filterable
-          class="f-ctl f-w150"
-          @update:value="handleSearch"
-        />
-        <n-input
-          v-model:value="filters.area"
-          placeholder="检查区域"
-          clearable
-          class="f-ctl f-w130"
-          @keyup.enter="handleSearch"
-        />
-        <n-input
-          v-model:value="filters.keyword"
-          placeholder="描述 / 人员 / 单位 关键字"
-          clearable
-          class="f-ctl f-w180"
-          @keyup.enter="handleSearch"
-        />
-        <n-date-picker
-          v-model:value="filters.dateRange"
-          type="daterange"
-          placeholder="检查日期范围"
-          clearable
-          class="f-ctl f-w240"
-        />
-        <div class="spacer" />
-        <div class="f-actions">
-          <n-button type="primary" @click="handleSearch">
-            <template #icon><n-icon><refresh-outline /></n-icon></template>
-            查询
-          </n-button>
-          <n-button @click="handleReset">重置</n-button>
-          <n-button type="primary" secondary @click="goCreate">
-            <template #icon><n-icon><add-outline /></n-icon></template>
-            新增隐患
-          </n-button>
-        </div>
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">隐患台账</h1>
       </div>
+      <n-button type="primary" @click="goCreate">新增隐患</n-button>
+    </div>
 
+    <n-card class="filter-card">
+      <div class="filter-heading">
+        <span class="filter-title">筛选条件</span>
+      </div>
+      <div class="filter-fields">
+        <label class="filter-field">
+          <span>隐患类型</span>
+          <n-select
+            v-model:value="filters.typeId"
+            :options="typeOptions"
+            placeholder="按大类分组选择"
+            clearable
+            filterable
+            class="full-width"
+            @update:value="handleSearch"
+          />
+        </label>
+        <label class="filter-field">
+          <span>整改状态</span>
+          <n-select
+            v-model:value="filters.status"
+            :options="statusOptions"
+            placeholder="全部"
+            clearable
+            class="full-width"
+            @update:value="handleSearch"
+          />
+        </label>
+        <label class="filter-field">
+          <span>隐患等级</span>
+          <n-select
+            v-model:value="filters.level"
+            :options="levelOptions"
+            placeholder="全部"
+            clearable
+            class="full-width"
+            @update:value="handleSearch"
+          />
+        </label>
+        <label class="filter-field">
+          <span>责任单位</span>
+          <n-select
+            v-model:value="filters.unitId"
+            :options="unitOptions"
+            placeholder="全部"
+            clearable
+            filterable
+            class="full-width"
+            @update:value="handleSearch"
+          />
+        </label>
+        <label class="filter-field">
+          <span>检查区域</span>
+          <n-input
+            v-model:value="filters.area"
+            placeholder="如：华星现场"
+            clearable
+            class="full-width"
+            @keyup.enter="handleSearch"
+          />
+        </label>
+        <label class="filter-field">
+          <span>描述 / 人员 / 单位关键字</span>
+          <n-input
+            v-model:value="filters.keyword"
+            placeholder="模糊搜索"
+            clearable
+            class="full-width"
+            @keyup.enter="handleSearch"
+          />
+        </label>
+        <label class="filter-field">
+          <span>检查日期范围</span>
+          <n-date-picker
+            v-model:value="filters.dateRange"
+            type="daterange"
+            placeholder="起始 — 截止"
+            clearable
+            class="full-width"
+          />
+        </label>
+      </div>
+      <div class="filter-actions">
+        <n-button @click="handleReset">重置</n-button>
+        <n-button type="primary" :loading="loading" @click="handleSearch">查询</n-button>
+      </div>
+    </n-card>
+
+    <n-card class="data-card">
       <n-data-table
         :columns="columns"
         :data="items"
@@ -337,7 +360,8 @@ onMounted(() => {
         :scroll-x="1500"
         size="small"
       />
-      <div class="pager">
+      <div class="pagination-bar">
+        <span class="muted pager-total">共 {{ total }} 条</span>
         <n-pagination
           :page="page"
           :page-size="pageSize"
@@ -348,76 +372,34 @@ onMounted(() => {
           @update:page="handlePageChange"
           @update:page-size="(size: number) => { pageSize = size; page = 1; void loadList() }"
         />
-        <span class="pager-total">共 {{ total }} 条</span>
       </div>
     </n-card>
   </div>
 </template>
 
 <style scoped>
-.filter-toolbar .f-w200 {
-  width: 200px;
-  flex-shrink: 0;
+.filter-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 2px 16px;
 }
 
-.filter-toolbar .f-w130 {
-  width: 130px;
-  flex-shrink: 0;
-}
-
-.filter-toolbar .f-w150 {
-  width: 150px;
-  flex-shrink: 0;
-}
-
-.filter-toolbar .f-w180 {
-  width: 180px;
-  flex-shrink: 0;
-}
-
-.filter-toolbar .f-w240 {
-  width: 240px;
-  flex-shrink: 0;
-}
-
-.f-actions {
-  display: flex;
-  gap: 8px;
-}
-
-@media (max-width: 820px) {
-  .filter-toolbar .f-ctl {
-    width: 100% !important;
-    flex-shrink: 1;
-  }
-
-  .filter-toolbar .spacer {
-    display: none;
-  }
-
-  .f-actions {
-    width: 100%;
-  }
-
-  .f-actions > * {
-    flex: 1;
-  }
-}
-
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.pager-total {
-  font-size: 13px;
-  color: #1f2937;
+.filter-fields .filter-field {
+  min-width: 0;
 }
 
 .type-cell {
-  color: #17233d;
+  color: var(--color-text-strong);
+}
+
+.pager-total {
+  margin-right: auto;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .filter-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

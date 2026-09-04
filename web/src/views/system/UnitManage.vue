@@ -2,6 +2,7 @@
 import { h, onMounted, ref } from 'vue'
 import {
   NButton,
+  NCard,
   NDataTable,
   NForm,
   NFormItem,
@@ -74,6 +75,11 @@ function openEdit(row: ResponsibleUnit): void {
     status: row.status,
   }
   showModal.value = true
+}
+
+/** 整行可点击打开编辑弹窗（操作列的编辑按钮已移除）。 */
+function rowProps(row: ResponsibleUnit) {
+  return { onClick: () => openEdit(row) }
 }
 
 async function handleSave(): Promise<void> {
@@ -161,28 +167,25 @@ function confirmDelete(): void {
 }
 
 const columns: DataTableColumns<ResponsibleUnit> = [
-  { title: '单位名称', key: 'name', minWidth: 160 },
-  { title: '责任人', key: 'person', width: 110 },
-  { title: '备注', key: 'remark', ellipsis: { tooltip: true }, minWidth: 160 },
+  { title: '单位名称', key: 'name', minWidth: 180 },
+  { title: '责任人', key: 'person', width: 140 },
+  { title: '备注', key: 'remark', ellipsis: { tooltip: true }, minWidth: 180 },
   {
     title: '状态',
     key: 'status',
-    width: 80,
+    width: 90,
     render: (row) =>
-      h(NSwitch, {
-        value: row.status === 1,
-        size: 'small',
-        onUpdateValue: () => toggleStatus(row),
-      }),
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 110,
-    render: (row) =>
-      h('div', { style: 'display:flex;gap:8px' }, [
-        h(NButton, { size: 'small', onClick: () => openEdit(row) }, { default: () => '编辑' }),
-      ]),
+      h(
+        'span',
+        { onClick: (e: MouseEvent) => e.stopPropagation() },
+        [
+          h(NSwitch, {
+            value: row.status === 1,
+            size: 'small',
+            onUpdateValue: () => toggleStatus(row),
+          }),
+        ],
+      ),
   },
 ]
 
@@ -190,30 +193,37 @@ onMounted(loadList)
 </script>
 
 <template>
-  <div>
-    <div class="page-toolbar">
-      <div class="spacer" />
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">责任单位</h1>
+      </div>
       <n-button type="primary" @click="openCreate">新增单位</n-button>
     </div>
-    <n-data-table
-      :columns="columns"
-      :data="items"
-      :loading="loading"
-      :bordered="false"
-      :scroll-x="640"
-      size="small"
-      :row-key="(row: ResponsibleUnit) => row.id"
-    />
+
+    <n-card class="data-card">
+      <n-data-table
+        class="row-clickable"
+        :columns="columns"
+        :data="items"
+        :loading="loading"
+        :bordered="false"
+        :scroll-x="720"
+        size="small"
+        :row-key="(row: ResponsibleUnit) => row.id"
+        :row-props="rowProps"
+      />
+    </n-card>
 
     <n-modal
       v-model:show="showModal"
       preset="card"
       draggable
       :title="editingId === null ? '新增责任单位' : '编辑责任单位'"
-      style="width: 480px; max-width: 94vw"
+      style="width: min(560px, calc(100vw - 32px))"
       :mask-closable="false"
     >
-      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="72">
+      <n-form ref="formRef" :model="form" :rules="rules" label-placement="top">
         <n-form-item label="单位名称" path="name">
           <n-input v-model:value="form.name" placeholder="如：电气车间" />
         </n-form-item>
@@ -221,10 +231,18 @@ onMounted(loadList)
           <n-input v-model:value="form.person" placeholder="与该单位一一对应" />
         </n-form-item>
         <n-form-item label="备注">
-          <n-input v-model:value="form.remark" placeholder="可选" />
+          <n-input
+            v-model:value="form.remark"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 5 }"
+            placeholder="可选，补充单位职责、联系方式等说明"
+          />
         </n-form-item>
         <n-form-item label="启用">
           <n-switch v-model:value="form.status" :checked-value="1" :unchecked-value="0" />
+          <span class="switch-hint">
+            {{ form.status === 1 ? '启用：新增隐患时可选择该单位' : '停用：下拉选择时不可用' }}
+          </span>
         </n-form-item>
       </n-form>
       <template #footer>
@@ -245,6 +263,20 @@ onMounted(loadList)
 </template>
 
 <style scoped>
+.row-clickable :deep(.n-data-table-tr) {
+  cursor: pointer;
+}
+
+.row-clickable :deep(.n-data-table-tr:hover) {
+  background: rgba(63, 99, 216, 0.05);
+}
+
+.switch-hint {
+  margin-left: 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
 .modal-footer {
   display: flex;
   align-items: center;

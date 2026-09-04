@@ -1,50 +1,85 @@
-// NaiveUI 蓝色主题：除警示语义色外统一蓝色系。
+// NaiveUI 主题：整体对齐「备件管理系统」的视觉令牌（靛蓝主色 + 大圆角 + 柔和阴影）。
 import type { GlobalThemeOverrides } from 'naive-ui'
-
-/** 主蓝。 */
-export const PRIMARY_COLOR = '#1668dc'
-export const PRIMARY_HOVER = '#4098fc'
-export const PRIMARY_PRESSED = '#0f5ab9'
-export const PRIMARY_SUPPL = '#d9e8fb'
 
 export const themeOverrides: GlobalThemeOverrides = {
   common: {
-    primaryColor: PRIMARY_COLOR,
-    primaryColorHover: PRIMARY_HOVER,
-    primaryColorPressed: PRIMARY_PRESSED,
-    primaryColorSuppl: PRIMARY_SUPPL,
-    borderRadius: '6px',
-  },
-  Button: {
-    fontWeight: '500',
-  },
-  Menu: {
-    itemTextColorActive: PRIMARY_COLOR,
-    itemIconColorActive: PRIMARY_COLOR,
-    itemColorActive: PRIMARY_SUPPL,
-    itemColorActiveHover: PRIMARY_SUPPL,
-    itemColorHover: 'rgba(22, 104, 220, 0.08)',
-  },
-  Layout: {
-    siderColor: '#ffffff',
-    headerColor: '#ffffff',
-    color: '#f0f4fa',
+    primaryColor: '#3f63d8',
+    primaryColorHover: '#5376e4',
+    primaryColorPressed: '#3151bd',
+    primaryColorSuppl: '#3f63d8',
+    infoColor: '#3f63d8',
+    infoColorHover: '#5376e4',
+    infoColorPressed: '#3151bd',
+    infoColorSuppl: '#3f63d8',
+    successColor: '#229b6b',
+    successColorHover: '#32ad7c',
+    successColorPressed: '#198057',
+    successColorSuppl: '#229b6b',
+    textColorBase: '#172033',
+    textColor1: '#172033',
+    textColor2: '#4b5565',
+    textColor3: '#7d8798',
+    placeholderColor: '#a1a9b7',
+    dividerColor: '#edf0f5',
+    borderColor: '#e2e7ef',
+    bodyColor: '#f4f6fa',
+    cardColor: '#ffffff',
+    tableHeaderColor: '#f7f9fc',
+    hoverColor: '#f3f6ff',
+    tableColorHover: '#f4f7ff',
+    borderRadius: '10px',
+    borderRadiusSmall: '8px',
+    boxShadow1: '0 8px 24px rgba(15, 23, 42, 0.05)',
+    boxShadow2: '0 14px 36px rgba(15, 23, 42, 0.08)',
   },
   Card: {
-    borderColor: '#dbe5f1',
+    borderRadius: '14px',
+    borderColor: '#e7ebf2',
+    paddingMedium: '20px 22px',
+    titleTextColor: '#172033',
+    titleFontWeight: '600',
+    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.05)',
+  },
+  Button: {
+    borderRadiusMedium: '9px',
+    borderRadiusSmall: '8px',
+    fontWeight: '500',
+  },
+  Input: {
+    borderRadius: '9px',
+  },
+  Select: {
+    peers: {
+      InternalSelection: {
+        borderRadius: '9px',
+      },
+    },
   },
   DataTable: {
-    thColor: '#f2f7fd',
-    thTextColor: '#1f2937',
-    borderColor: '#e2e9f2',
+    borderRadius: '10px',
+    borderColor: '#edf0f5',
+    thColor: '#f7f9fc',
+    thColorHover: '#f3f6fb',
+    thTextColor: '#3d4758',
+    thFontWeight: '600',
+    tdColorHover: '#f4f7ff',
   },
-  Tabs: {
-    tabTextColorActive: PRIMARY_COLOR,
-    tabColorSegment: PRIMARY_SUPPL,
-    // 去掉 line 型页签导航底部通栏分割线（其下紧邻列表工具条）
-    tabBorderColor: 'transparent',
+  Menu: {
+    borderRadius: '10px',
+    itemColorHover: '#f4f6fb',
+    itemColorActive: '#edf2ff',
+    itemColorActiveHover: '#e7edff',
+    itemColorActiveCollapsed: '#edf2ff',
+    itemTextColorActive: '#3658c7',
+    itemTextColorActiveHover: '#3151bd',
+    itemTextColorChildActive: '#3658c7',
+    itemTextColorChildActiveHover: '#3151bd',
+    arrowColorActive: '#3658c7',
+    arrowColorChildActive: '#3658c7',
   },
-  Tag: {
-    borderRadius: '4px',
+  Layout: {
+    color: '#f4f6fa',
+    siderColor: '#ffffff',
+    headerColor: '#ffffff',
   },
 }

@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, h, type Component } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { NMenu, NIcon, type MenuOption } from 'naive-ui'
-import { HomeOutline, WarningOutline, OptionsOutline } from '@vicons/ionicons5'
+import { NMenu, type MenuOption } from 'naive-ui'
 
 const props = defineProps<{
   /** 桌面端折叠状态（抽屉中恒为展开）。 */
@@ -13,17 +12,12 @@ defineEmits<{ select: [key: string] }>()
 
 const route = useRoute()
 
-function renderIcon(icon: Component) {
-  return () => h(NIcon, null, { default: () => h(icon) })
-}
-
 const menuOptions: MenuOption[] = [
-  { label: '工作台', key: '/dashboard', icon: renderIcon(HomeOutline) },
-  { label: '隐患管理', key: '/hazards', icon: renderIcon(WarningOutline) },
+  { label: '工作台', key: '/dashboard' },
+  { label: '隐患管理', key: '/hazards' },
   {
     label: '系统管理',
     key: '/system',
-    icon: renderIcon(OptionsOutline),
     children: [
       { label: '责任单位', key: '/system/units' },
       { label: '隐患类型', key: '/system/types' },
@@ -41,21 +35,16 @@ const isCollapsed = computed<boolean>(() => props.collapsed === true)
 
 <template>
   <div class="sider-content">
-    <div class="brand" :class="{ 'brand--collapsed': isCollapsed }">
+    <div class="brand" :class="{ 'brand--compact': isCollapsed }">
       <img class="brand-logo" src="/logo.png" alt="电气车间隐患闭环" />
-      <div v-show="!isCollapsed" class="brand-text">
-        <div class="brand-title">电气车间隐患闭环</div>
-        <div class="brand-sub">Hazard Closed-Loop</div>
-      </div>
+      <span v-if="!isCollapsed" class="brand-name">电气车间隐患闭环</span>
     </div>
     <n-menu
       :value="activeKey"
       :options="menuOptions"
-      :root-indent="16"
-      :indent="24"
       :collapsed="isCollapsed"
       :collapsed-width="64"
-      :collapsed-icon-size="22"
+      :collapsed-icon-size="20"
       @update:value="(key: string) => $emit('select', key)"
     />
   </div>
@@ -67,39 +56,27 @@ const isCollapsed = computed<boolean>(() => props.collapsed === true)
 }
 
 .brand {
+  height: 68px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 14px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-strong);
+  font-size: 16px;
+  font-weight: 650;
+  white-space: nowrap;
 }
 
-.brand--collapsed {
+.brand--compact {
   justify-content: center;
-  padding: 16px 8px;
+  padding: 0;
 }
 
 .brand-logo {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   object-fit: contain;
-  flex-shrink: 0;
-}
-
-.brand-text {
-  min-width: 0;
-}
-
-.brand-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #17233d;
-  white-space: nowrap;
-}
-
-.brand-sub {
-  font-size: 12px;
-  color: #5a7fd0;
-  letter-spacing: 0.4px;
-  white-space: nowrap;
+  flex: none;
 }
 </style>

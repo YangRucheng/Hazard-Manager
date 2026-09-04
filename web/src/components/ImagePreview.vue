@@ -40,7 +40,7 @@ const props = withDefaults(defineProps<{ imageIds: string[] | undefined | null; 
 
 .preview-item {
   border-radius: 4px;
-  border: 1px solid #dbe5f1;
+  border: 1px solid var(--color-border);
   overflow: hidden;
 }
 </style>
