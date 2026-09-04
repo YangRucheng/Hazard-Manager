@@ -21,6 +21,7 @@ import {
 import { client, errorMessage } from '@/api/client'
 import ImageUpload from '@/components/ImageUpload.vue'
 import { formatDate } from '@/utils/date'
+import { useIsMobile } from '@/utils/media'
 
 import type { components } from '@/api/schema'
 
@@ -48,6 +49,7 @@ interface FormModel {
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
+const isMobile = useIsMobile()
 
 const isEdit = computed<boolean>(() => route.name === 'hazard-edit')
 const hazardId = computed<number>(() => Number(route.params.id))
@@ -276,12 +278,12 @@ onMounted(() => {
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-placement="left"
-        label-width="110"
+        :label-placement="isMobile ? 'top' : 'left'"
+        :label-width="isMobile ? undefined : 110"
         :disabled="loading"
         style="max-width: 1080px"
       >
-        <n-grid :cols="2" :x-gap="24">
+        <n-grid :cols="isMobile ? 1 : 2" :x-gap="24">
           <n-grid-item>
             <n-form-item label="检查区域" path="inspectionArea">
               <n-input v-model:value="form.inspectionArea" placeholder="默认：华星现场" />
@@ -307,7 +309,7 @@ onMounted(() => {
               <n-select v-model:value="form.level" :options="levelOptions" />
             </n-form-item>
           </n-grid-item>
-          <n-grid-item :span="2">
+          <n-grid-item :span="isMobile ? 1 : 2">
             <n-form-item label="隐患描述" path="description">
               <n-input
                 v-model:value="form.description"
@@ -317,7 +319,7 @@ onMounted(() => {
               />
             </n-form-item>
           </n-grid-item>
-          <n-grid-item :span="2">
+          <n-grid-item :span="isMobile ? 1 : 2">
             <n-form-item label="建议整改方案">
               <n-input
                 v-model:value="form.suggestion"
@@ -378,17 +380,17 @@ onMounted(() => {
               />
             </n-form-item>
           </n-grid-item>
-          <n-grid-item :span="2">
+          <n-grid-item :span="isMobile ? 1 : 2">
             <n-form-item label="整改前图片">
               <ImageUpload v-model="form.beforeImageIds" placeholder="上传整改前图片" />
             </n-form-item>
           </n-grid-item>
-          <n-grid-item :span="2">
+          <n-grid-item :span="isMobile ? 1 : 2">
             <n-form-item label="整改后图片">
               <ImageUpload v-model="form.afterImageIds" placeholder="上传整改后图片" />
             </n-form-item>
           </n-grid-item>
-          <n-grid-item :span="2">
+          <n-grid-item :span="isMobile ? 1 : 2">
             <n-form-item label="备注">
               <n-input
                 v-model:value="form.remark"

@@ -27,7 +27,7 @@ func newTestRouter(t *testing.T) (*gin.Engine, *auth.Manager) {
 	am := auth.NewManager("test-secret", time.Hour, "pw")
 	store, err := upload.NewStore(t.TempDir(), nil)
 	require.NoError(t, err)
-	srv := handler.NewServer(nil, nil, nil, am, store, 0)
+	srv := handler.NewServer(nil, nil, nil, nil, am, store, 0)
 	return NewRouter(srv, am), am
 }
 

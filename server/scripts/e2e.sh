@@ -161,12 +161,25 @@ assert_status "删除被引用单位 409" 409 "$(curl -s -o /dev/null -w '%{http
 assert_status "删除被引用类型 409" 409 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/hazard-types/$TYPE_ID" "${AUTH[@]}")"
 assert_status "删除未引用类型 204" 204 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/hazard-types/$NEWTYPE_ID" "${AUTH[@]}")"
 assert_status "删除不存在单位 404" 404 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/units/999999" "${AUTH[@]}")"
+assert_status "删除被引用附件 409" 409 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/images/$IMG_ID" "${AUTH[@]}")"
+REF_COUNT="$(curl -s "$BASE_URL/api/v1/images" "${AUTH[@]}" | jq -r --arg id "$IMG_ID" '[.items[] | select(.id == $id) | .refCount] | first')"
+assert_eq "附件列表含引用计数" "true" "$([[ "${REF_COUNT:-0}" -ge 1 ]] && echo true || echo false)"
+UNUSED_HAS_IMG="$(curl -s "$BASE_URL/api/v1/images?onlyUnused=true" "${AUTH[@]}" | jq -r --arg id "$IMG_ID" '[.items[] | select(.id == $id)] | length')"
+assert_eq "被引用附件不在仅未引用列表" "0" "$UNUSED_HAS_IMG"
+KEYWORD_HITS="$(curl -s "$BASE_URL/api/v1/images?keyword=${IMG_ID:0:8}" "${AUTH[@]}" | jq -r --arg id "$IMG_ID" '[.items[] | select(.id == $id)] | length')"
+assert_eq "关键字前缀匹配到附件" "1" "$KEYWORD_HITS"
 
 echo "== 9. 软删除 =="
 assert_status "删除隐患 204" 204 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/hazards/$HAZARD_ID" "${AUTH[@]}")"
 AFTER_TOTAL="$(curl -s "$BASE_URL/api/v1/hazards" "${AUTH[@]}" | jq '.pagination.total')"
 TOTAL_AFTER_DELETE="$((LIST_TOTAL - 1))"
 assert_eq "删除后列表总数 -1" "$TOTAL_AFTER_DELETE" "$AFTER_TOTAL"
+
+echo "== 10. 附件清理（隐患软删后附件不再被引用） =="
+assert_status "删除已解除引用的附件 204" 204 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/images/$IMG_ID2" "${AUTH[@]}")"
+GONE="$(curl -s "$BASE_URL/api/v1/images?pageSize=100" "${AUTH[@]}" | jq -r --arg id "$IMG_ID2" '[.items[] | select(.id == $id)] | length')"
+assert_eq "删除后列表不含该附件" "0" "$GONE"
+assert_status "删除不存在附件 404" 404 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/images/00000000000000000000000000000000" "${AUTH[@]}")"
 
 rm -rf "$TMPDIR_E2E"
 

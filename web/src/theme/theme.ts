@@ -26,7 +26,7 @@ export const themeOverrides: GlobalThemeOverrides = {
     itemColorHover: 'rgba(22, 104, 220, 0.08)',
   },
   Layout: {
-    siderColor: '#f5f8fc',
+    siderColor: '#ffffff',
     headerColor: '#ffffff',
     color: '#f0f4fa',
   },
@@ -41,6 +41,8 @@ export const themeOverrides: GlobalThemeOverrides = {
   Tabs: {
     tabTextColorActive: PRIMARY_COLOR,
     tabColorSegment: PRIMARY_SUPPL,
+    // 去掉 line 型页签导航底部通栏分割线（其下紧邻列表工具条）
+    tabBorderColor: 'transparent',
   },
   Tag: {
     borderRadius: '4px',

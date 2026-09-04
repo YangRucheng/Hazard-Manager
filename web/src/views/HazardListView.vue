@@ -24,6 +24,7 @@ import StatusTag from '@/components/StatusTag.vue'
 import LevelTag from '@/components/LevelTag.vue'
 import ImagePreview from '@/components/ImagePreview.vue'
 import { formatDate, isOverdue } from '@/utils/date'
+import { useIsMobile } from '@/utils/media'
 
 import type { components } from '@/api/schema'
 
@@ -46,6 +47,7 @@ interface Filters {
 const router = useRouter()
 const message = useMessage()
 const dialog = useDialog()
+const isMobile = useIsMobile()
 
 const loading = ref(false)
 const items = ref<Hazard[]>([])
@@ -256,14 +258,14 @@ onMounted(() => {
 <template>
   <div class="page">
     <n-card :bordered="true" class="filter-card">
-      <div class="page-toolbar">
+      <div class="page-toolbar filter-toolbar">
         <n-select
           v-model:value="filters.typeId"
           :options="typeOptions"
           placeholder="隐患类型"
           clearable
           filterable
-          style="width: 200px"
+          class="f-ctl f-w200"
           @update:value="handleSearch"
         />
         <n-select
@@ -271,7 +273,7 @@ onMounted(() => {
           :options="statusOptions"
           placeholder="整改状态"
           clearable
-          style="width: 130px"
+          class="f-ctl f-w130"
           @update:value="handleSearch"
         />
         <n-select
@@ -279,7 +281,7 @@ onMounted(() => {
           :options="levelOptions"
           placeholder="隐患等级"
           clearable
-          style="width: 130px"
+          class="f-ctl f-w130"
           @update:value="handleSearch"
         />
         <n-select
@@ -288,21 +290,21 @@ onMounted(() => {
           placeholder="责任单位"
           clearable
           filterable
-          style="width: 150px"
+          class="f-ctl f-w150"
           @update:value="handleSearch"
         />
         <n-input
           v-model:value="filters.area"
           placeholder="检查区域"
           clearable
-          style="width: 130px"
+          class="f-ctl f-w130"
           @keyup.enter="handleSearch"
         />
         <n-input
           v-model:value="filters.keyword"
           placeholder="描述 / 人员 / 单位 关键字"
           clearable
-          style="width: 180px"
+          class="f-ctl f-w180"
           @keyup.enter="handleSearch"
         />
         <n-date-picker
@@ -310,18 +312,20 @@ onMounted(() => {
           type="daterange"
           placeholder="检查日期范围"
           clearable
-          style="width: 240px"
+          class="f-ctl f-w240"
         />
         <div class="spacer" />
-        <n-button type="primary" @click="handleSearch">
-          <template #icon><n-icon><refresh-outline /></n-icon></template>
-          查询
-        </n-button>
-        <n-button @click="handleReset">重置</n-button>
-        <n-button type="primary" secondary @click="goCreate">
-          <template #icon><n-icon><add-outline /></n-icon></template>
-          新增隐患
-        </n-button>
+        <div class="f-actions">
+          <n-button type="primary" @click="handleSearch">
+            <template #icon><n-icon><refresh-outline /></n-icon></template>
+            查询
+          </n-button>
+          <n-button @click="handleReset">重置</n-button>
+          <n-button type="primary" secondary @click="goCreate">
+            <template #icon><n-icon><add-outline /></n-icon></template>
+            新增隐患
+          </n-button>
+        </div>
       </div>
 
       <n-data-table
@@ -339,7 +343,8 @@ onMounted(() => {
           :page-size="pageSize"
           :item-count="total"
           :page-sizes="[10, 20, 50]"
-          show-size-picker
+          :show-size-picker="!isMobile"
+          :simple="isMobile"
           @update:page="handlePageChange"
           @update:page-size="(size: number) => { pageSize = size; page = 1; void loadList() }"
         />
@@ -350,6 +355,55 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.filter-toolbar .f-w200 {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.filter-toolbar .f-w130 {
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.filter-toolbar .f-w150 {
+  width: 150px;
+  flex-shrink: 0;
+}
+
+.filter-toolbar .f-w180 {
+  width: 180px;
+  flex-shrink: 0;
+}
+
+.filter-toolbar .f-w240 {
+  width: 240px;
+  flex-shrink: 0;
+}
+
+.f-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 820px) {
+  .filter-toolbar .f-ctl {
+    width: 100% !important;
+    flex-shrink: 1;
+  }
+
+  .filter-toolbar .spacer {
+    display: none;
+  }
+
+  .f-actions {
+    width: 100%;
+  }
+
+  .f-actions > * {
+    flex: 1;
+  }
+}
+
 .pager {
   display: flex;
   align-items: center;
