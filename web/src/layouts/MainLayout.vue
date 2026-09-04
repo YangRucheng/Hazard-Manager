@@ -75,7 +75,7 @@ function handleLogout(): void {
   <n-layout class="main-layout" has-sider position="absolute">
     <n-layout-sider bordered :width="220" :native-scrollbar="false">
       <div class="brand">
-        <div class="brand-mark">危</div>
+        <img class="brand-logo" src="/logo.png" alt="电气车间隐患闭环" />
         <div>
           <div class="brand-title">电气车间隐患闭环</div>
           <div class="brand-sub">Hazard Closed-Loop</div>
@@ -127,17 +127,11 @@ function handleLogout(): void {
   padding: 16px 14px;
 }
 
-.brand-mark {
+.brand-logo {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #1668dc, #4098fc);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .brand-title {
