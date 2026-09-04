@@ -26,6 +26,13 @@ body {
   padding: 16px;
 }
 
+/* 移动端收紧页面留白 */
+@media (max-width: 820px) {
+  .page {
+    padding: 10px;
+  }
+}
+
 /* 表格页工具条 */
 .page-toolbar {
   display: flex;

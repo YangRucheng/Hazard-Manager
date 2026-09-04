@@ -9,7 +9,6 @@ import {
   NInputNumber,
   NModal,
   NSwitch,
-  NTag,
   useDialog,
   useMessage,
   type DataTableColumns,
@@ -175,16 +174,13 @@ const columns: DataTableColumns<ResponsibleUnit> = [
   {
     title: '状态',
     key: 'status',
-    width: 110,
+    width: 80,
     render: (row) =>
-      h(
-        NSwitch,
-        { value: row.status === 1, onUpdateValue: () => toggleStatus(row), size: 'small' },
-        {
-          checked: () => h(NTag, { type: 'success', size: 'small', bordered: false }, { default: () => '启用' }),
-          unchecked: () => h(NTag, { type: 'default', size: 'small', bordered: false }, { default: () => '停用' }),
-        },
-      ),
+      h(NSwitch, {
+        value: row.status === 1,
+        size: 'small',
+        onUpdateValue: () => toggleStatus(row),
+      }),
   },
   {
     title: '操作',
@@ -211,6 +207,7 @@ onMounted(loadList)
       :data="items"
       :loading="loading"
       :bordered="false"
+      :scroll-x="760"
       size="small"
       :row-key="(row: ResponsibleUnit) => row.id"
     />
@@ -220,7 +217,7 @@ onMounted(loadList)
       preset="card"
       draggable
       :title="editingId === null ? '新增责任单位' : '编辑责任单位'"
-      style="width: 480px"
+      style="width: 480px; max-width: 94vw"
       :mask-closable="false"
     >
       <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="72">

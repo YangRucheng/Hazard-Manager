@@ -185,6 +185,7 @@ onMounted(loadList)
       :data="list"
       :loading="loading"
       :bordered="false"
+      :scroll-x="640"
       size="small"
       :row-key="(row: HazardType) => row.id"
     />
@@ -194,7 +195,7 @@ onMounted(loadList)
       preset="card"
       draggable
       :title="editingId === null ? '新增隐患类型' : '编辑隐患类型'"
-      style="width: 520px"
+      style="width: 520px; max-width: 94vw"
       :mask-closable="false"
     >
       <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="72">

@@ -80,10 +80,12 @@ async function handleSubmit(): Promise<void> {
 
 <style scoped>
 .login-page {
-  height: 100vh;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px 0;
   background:
     radial-gradient(1200px 500px at 20% -10%, rgba(64, 152, 252, 0.35), transparent 60%),
     radial-gradient(1000px 500px at 90% 110%, rgba(22, 104, 220, 0.3), transparent 55%),
@@ -91,12 +93,18 @@ async function handleSubmit(): Promise<void> {
 }
 
 .login-card {
-  width: 380px;
+  width: min(380px, calc(100vw - 32px));
   padding: 40px 36px 32px;
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 12px 40px rgba(22, 104, 220, 0.12);
   border: 1px solid #dbe5f1;
+}
+
+@media (max-width: 820px) {
+  .login-card {
+    padding: 28px 20px 24px;
+  }
 }
 
 .login-head {

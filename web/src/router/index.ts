@@ -7,9 +7,10 @@ import LoginView from '@/views/LoginView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import HazardListView from '@/views/HazardListView.vue'
 import HazardFormView from '@/views/HazardFormView.vue'
-import EnumLayout from '@/views/enums/EnumLayout.vue'
-import UnitManage from '@/views/enums/UnitManage.vue'
-import TypeManage from '@/views/enums/TypeManage.vue'
+import SystemLayout from '@/views/system/SystemLayout.vue'
+import UnitManage from '@/views/system/UnitManage.vue'
+import TypeManage from '@/views/system/TypeManage.vue'
+import AttachmentManage from '@/views/system/AttachmentManage.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -28,14 +29,24 @@ const routes: RouteRecordRaw[] = [
       { path: 'hazards/new', name: 'hazard-create', component: HazardFormView, meta: { title: '新增隐患' } },
       { path: 'hazards/:id/edit', name: 'hazard-edit', component: HazardFormView, meta: { title: '编辑隐患' } },
       {
-        path: 'enums',
-        component: EnumLayout,
+        path: 'system',
+        component: SystemLayout,
         children: [
-          { path: '', redirect: '/enums/units' },
-          { path: 'units', name: 'enums-units', component: UnitManage, meta: { title: '责任单位' } },
-          { path: 'types', name: 'enums-types', component: TypeManage, meta: { title: '隐患类型' } },
+          { path: '', redirect: '/system/units' },
+          { path: 'units', name: 'system-units', component: UnitManage, meta: { title: '责任单位' } },
+          { path: 'types', name: 'system-types', component: TypeManage, meta: { title: '隐患类型' } },
+          {
+            path: 'attachments',
+            name: 'system-attachments',
+            component: AttachmentManage,
+            meta: { title: '附件管理' },
+          },
         ],
       },
+      // 旧「枚举值管理」路径重定向到「系统管理」。
+      { path: 'enums', redirect: '/system/units' },
+      { path: 'enums/units', redirect: '/system/units' },
+      { path: 'enums/types', redirect: '/system/types' },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
