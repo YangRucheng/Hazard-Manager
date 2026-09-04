@@ -186,16 +186,15 @@ type Hazard struct {
 	Status         HazardStatus   `gorm:"type:enum('待整改','整改受阻','已整改');not null;default:'待整改'" json:"status"`
 	AfterImages    string         `gorm:"type:varchar(2048);not null;default:''" json:"-"`
 	TypeID         uint64         `gorm:"not null;index" json:"typeId"`
-	CategoryID     uint64         `gorm:"not null;index" json:"categoryId"`
 	Level          HazardLevel    `gorm:"type:enum('一般隐患','重大隐患');not null;default:'一般隐患'" json:"level"`
 	Remark         *string        `gorm:"type:text" json:"remark"`
 	CreatedAt      time.Time      `json:"createdAt"`
 	UpdatedAt      time.Time      `json:"updatedAt"`
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
 
-	UnitName     string `gorm:"-" json:"unitName"`
-	TypeName     string `gorm:"-" json:"typeName"`
-	CategoryName string `gorm:"-" json:"categoryName"`
+	UnitName  string `gorm:"-" json:"unitName"`
+	TypeMajor string `gorm:"-" json:"typeMajor"`
+	TypeMinor string `gorm:"-" json:"typeMinor"`
 }
 
 // SplitImages 将逗号分隔的 uuid 串拆为数组；空串返回空数组。
@@ -250,16 +249,15 @@ type ResponsibleUnit struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// HazardType 隐患类型/分类枚举表（单表两级：parent_id=0 为大类，>0 为小类）。
+// HazardType 隐患类型枚举表：每行一个「大类(major)+小类(minor)」组合，
+// 无父级引用、无排序、无启停；同一组合唯一。隐患记录仅引用该行 id。
+// 删除为物理删除（服务层保证未被引用），便于同名组合复用。
 type HazardType struct {
-	ID        uint64         `gorm:"primaryKey" json:"id"`
-	ParentID  uint64         `gorm:"not null;default:0;index" json:"parentId"`
-	Name      string         `gorm:"type:varchar(128);not null" json:"name"`
-	Sort      int            `gorm:"not null;default:0" json:"sort"`
-	Status    int            `gorm:"not null;default:1" json:"status"` // 0=停用 1=启用
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID        uint64    `gorm:"primaryKey" json:"id"`
+	Major     string    `gorm:"type:varchar(128);not null;uniqueIndex:uk_hazard_type_major_minor" json:"major"`
+	Minor     string    `gorm:"type:varchar(128);not null;uniqueIndex:uk_hazard_type_major_minor" json:"minor"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // Image 图片摘要表：只存 uuid 与摘要（SHA-256），不存文件名。

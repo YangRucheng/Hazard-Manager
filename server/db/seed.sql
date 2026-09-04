@@ -6,14 +6,10 @@ INSERT INTO responsible_units (name, person, sort, status, created_at, updated_a
   ('动力车间',   '李四', 2, 1, NOW(), NOW()),
   ('自动化班组', '王五', 3, 1, NOW(), NOW());
 
-INSERT INTO hazard_types (parent_id, name, sort, status, created_at, updated_at) VALUES
-  (0, '电气设备', 1, 1, NOW(), NOW()),
-  (0, '安全防护', 2, 1, NOW(), NOW());
-
--- 小类（分类）通过 parent_id 关联上述大类（假设大类 id 为 1、2，实际以插入后 id 为准）
-INSERT INTO hazard_types (parent_id, name, sort, status, created_at, updated_at) VALUES
-  (1, '线路老化',     1, 1, NOW(), NOW()),
-  (1, '接线不规范',   2, 1, NOW(), NOW()),
-  (1, '绝缘破损',     3, 1, NOW(), NOW()),
-  (2, '警示标识缺失', 1, 1, NOW(), NOW()),
-  (2, '防护罩缺失',   2, 1, NOW(), NOW());
+-- 隐患类型：每行一个「大类(major)+小类(minor)」组合，无父级引用
+INSERT INTO hazard_types (major, minor, created_at, updated_at) VALUES
+  ('电气设备', '线路老化',     NOW(), NOW()),
+  ('电气设备', '接线不规范',   NOW(), NOW()),
+  ('电气设备', '绝缘破损',     NOW(), NOW()),
+  ('安全防护', '警示标识缺失', NOW(), NOW()),
+  ('安全防护', '防护罩缺失',   NOW(), NOW());

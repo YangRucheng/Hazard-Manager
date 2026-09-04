@@ -109,9 +109,6 @@ function handleBeforeUpload(data: { file: UploadFileInfo }): boolean {
         <div class="upload-inner">
           <n-icon size="28" color="#1668dc"><cloud-upload-outline /></n-icon>
           <span>{{ placeholder }}</span>
-          <span class="upload-hint">
-            支持 jpg/png/webp/gif，≤10MB，最多 {{ max }} 张；相同图片自动去重
-          </span>
         </div>
       </n-upload-dragger>
     </n-upload>
@@ -153,10 +150,5 @@ function handleBeforeUpload(data: { file: UploadFileInfo }): boolean {
   gap: 6px;
   padding: 8px 0;
   color: #17233d;
-}
-
-.upload-hint {
-  font-size: 12px;
-  color: #8a97ab;
 }
 </style>

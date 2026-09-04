@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, h } from 'vue'
 import { useRouter } from 'vue-router'
-import { NCard, NGrid, NGridItem, NDataTable, useMessage, type DataTableColumns, NButton } from 'naive-ui'
+import { NCard, NGrid, NGridItem, NDataTable, NTag, useMessage, type DataTableColumns, NButton } from 'naive-ui'
 
 import { client, errorMessage } from '@/api/client'
 import StatusTag from '@/components/StatusTag.vue'
@@ -79,7 +79,9 @@ const columns: DataTableColumns<Hazard> = [
       const overdue = isOverdue(row.dueDate, row.status)
       return h('div', { style: 'display:flex;align-items:center;gap:6px' }, [
         h(StatusTag, { status: row.status }),
-        overdue ? h('span', { style: 'color:#d03050;font-size:12px' }, '逾期') : null,
+        overdue
+          ? h(NTag, { type: 'error', size: 'small', bordered: false }, { default: () => '逾期' })
+          : null,
       ])
     },
   },
@@ -93,7 +95,12 @@ const columns: DataTableColumns<Hazard> = [
     title: '操作',
     key: 'actions',
     width: 80,
-    render: (row) => h(NButton, { size: 'small', text: true, type: 'primary', onClick: () => editHazard(row.id) }, { default: () => '查看' }),
+    render: (row) =>
+      h(
+        NButton,
+        { size: 'small', type: 'primary', secondary: true, onClick: () => editHazard(row.id) },
+        { default: () => '查看' },
+      ),
   },
 ]
 
@@ -131,7 +138,7 @@ onMounted(loadData)
 
 .stat-label {
   font-size: 13px;
-  color: #6b7a90;
+  font-weight: 600;
 }
 
 .stat-value {

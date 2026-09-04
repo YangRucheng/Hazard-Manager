@@ -15,17 +15,16 @@ var ErrNotFound = errors.New("资源不存在")
 
 // HazardFilter 隐患列表筛选条件（全类型化）。
 type HazardFilter struct {
-	Status     *string
-	Level      *string
-	TypeID     *uint64
-	CategoryID *uint64
-	UnitID     *uint64
-	Area       *string
-	Keyword    *string
-	DateFrom   *string // YYYY-MM-DD
-	DateTo     *string // YYYY-MM-DD
-	Page       int
-	PageSize   int
+	Status   *string
+	Level    *string
+	TypeID   *uint64
+	UnitID   *uint64
+	Area     *string
+	Keyword  *string
+	DateFrom *string // YYYY-MM-DD
+	DateTo   *string // YYYY-MM-DD
+	Page     int
+	PageSize int
 }
 
 // DefaultPagination 返回默认分页。
@@ -58,9 +57,6 @@ func (r *HazardRepo) applyFilter(q *gorm.DB, f HazardFilter) *gorm.DB {
 	if f.TypeID != nil && *f.TypeID > 0 {
 		q = q.Where("hazards.type_id = ?", *f.TypeID)
 	}
-	if f.CategoryID != nil && *f.CategoryID > 0 {
-		q = q.Where("hazards.category_id = ?", *f.CategoryID)
-	}
 	if f.UnitID != nil && *f.UnitID > 0 {
 		q = q.Where("hazards.unit_id = ?", *f.UnitID)
 	}
@@ -87,9 +83,9 @@ func (r *HazardRepo) applyFilter(q *gorm.DB, f HazardFilter) *gorm.DB {
 // 因此 JOIN 查询用本类型承载，再转回 model.Hazard。
 type hazardRow struct {
 	model.Hazard
-	UnitName     string `gorm:"column:unit_name"`
-	TypeName     string `gorm:"column:type_name"`
-	CategoryName string `gorm:"column:category_name"`
+	UnitName  string `gorm:"column:unit_name"`
+	TypeMajor string `gorm:"column:type_major"`
+	TypeMinor string `gorm:"column:type_minor"`
 }
 
 func fromRows(rows []hazardRow) []model.Hazard {
@@ -97,8 +93,8 @@ func fromRows(rows []hazardRow) []model.Hazard {
 	for i := range rows {
 		out[i] = rows[i].Hazard
 		out[i].UnitName = rows[i].UnitName
-		out[i].TypeName = rows[i].TypeName
-		out[i].CategoryName = rows[i].CategoryName
+		out[i].TypeMajor = rows[i].TypeMajor
+		out[i].TypeMinor = rows[i].TypeMinor
 	}
 	return out
 }
@@ -108,7 +104,7 @@ func fromRow(row hazardRow) model.Hazard {
 	return rows[0]
 }
 
-// List 分页查询隐患（JOIN 返回单位/类型/分类名称）并按创建时间倒序。
+// List 分页查询隐患（JOIN 返回单位/类型名称）并按创建时间倒序。
 func (r *HazardRepo) List(f HazardFilter) ([]model.Hazard, int64, error) {
 	page, pageSize := DefaultPagination(f.Page, f.PageSize)
 
@@ -116,12 +112,12 @@ func (r *HazardRepo) List(f HazardFilter) ([]model.Hazard, int64, error) {
 		Select(`hazards.id, hazards.inspection_area, hazards.inspection_date, hazards.inspector,
 			hazards.description, hazards.suggestion, hazards.unit_id, hazards.person, hazards.due_date,
 			hazards.recheck_person, hazards.before_images, hazards.status, hazards.after_images,
-			hazards.type_id, hazards.category_id, hazards.level, hazards.remark,
+			hazards.type_id, hazards.level, hazards.remark,
 			hazards.created_at, hazards.updated_at,
-			COALESCE(u.name, '') AS unit_name, COALESCE(t.name, '') AS type_name, COALESCE(c.name, '') AS category_name`).
+			COALESCE(u.name, '') AS unit_name,
+			COALESCE(t.major, '') AS type_major, COALESCE(t.minor, '') AS type_minor`).
 		Joins("LEFT JOIN responsible_units u ON u.id = hazards.unit_id").
-		Joins("LEFT JOIN hazard_types t ON t.id = hazards.type_id").
-		Joins("LEFT JOIN hazard_types c ON c.id = hazards.category_id")
+		Joins("LEFT JOIN hazard_types t ON t.id = hazards.type_id")
 
 	base = r.applyFilter(base, f)
 
@@ -147,12 +143,12 @@ func (r *HazardRepo) GetByID(id uint64) (*model.Hazard, error) {
 		Select(`hazards.id, hazards.inspection_area, hazards.inspection_date, hazards.inspector,
 			hazards.description, hazards.suggestion, hazards.unit_id, hazards.person, hazards.due_date,
 			hazards.recheck_person, hazards.before_images, hazards.status, hazards.after_images,
-			hazards.type_id, hazards.category_id, hazards.level, hazards.remark,
+			hazards.type_id, hazards.level, hazards.remark,
 			hazards.created_at, hazards.updated_at,
-			COALESCE(u.name, '') AS unit_name, COALESCE(t.name, '') AS type_name, COALESCE(c.name, '') AS category_name`).
+			COALESCE(u.name, '') AS unit_name,
+			COALESCE(t.major, '') AS type_major, COALESCE(t.minor, '') AS type_minor`).
 		Joins("LEFT JOIN responsible_units u ON u.id = hazards.unit_id").
 		Joins("LEFT JOIN hazard_types t ON t.id = hazards.type_id").
-		Joins("LEFT JOIN hazard_types c ON c.id = hazards.category_id").
 		Where("hazards.id = ?", id).
 		First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -241,11 +237,11 @@ func (r *HazardRepo) CountReferencedUnit(unitID uint64) (int64, error) {
 	return n, nil
 }
 
-// CountReferencedType 统计某类型/分类被（含软删除的）隐患引用的数量。
+// CountReferencedType 统计某隐患类型被（含软删除的）隐患引用的数量，用于删除保护。
 func (r *HazardRepo) CountReferencedType(typeID uint64) (int64, error) {
 	var n int64
 	err := r.db.Unscoped().Model(&model.Hazard{}).
-		Where("type_id = ? OR category_id = ?", typeID, typeID).Count(&n).Error
+		Where("type_id = ?", typeID).Count(&n).Error
 	if err != nil {
 		return 0, fmt.Errorf("检查类型引用失败: %w", err)
 	}

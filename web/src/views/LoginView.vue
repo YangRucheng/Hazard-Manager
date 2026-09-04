@@ -120,10 +120,11 @@ async function handleSubmit(): Promise<void> {
 }
 
 .login-sub {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: #8a97ab;
-  letter-spacing: 1px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b8bf0;
+  letter-spacing: 0.6px;
 }
 
 .login-btn {

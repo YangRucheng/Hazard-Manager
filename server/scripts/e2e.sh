@@ -65,11 +65,25 @@ UNIT_NAME="$(echo "$UNITS" | jq -r '.[0].name')"
 UNIT_PERSON="$(echo "$UNITS" | jq -r '.[0].person')"
 
 TYPES="$(curl -s "$BASE_URL/api/v1/hazard-types" "${AUTH[@]}")"
-assert_eq "类型列表长度 ≥2 大类" "true" "$([[ "$(echo "$TYPES" | jq '[.[] | select(.parentId==0)] | length')" -ge 2 ]] && echo true || echo false)"
-TYPE_ID="$(echo "$TYPES" | jq -r '.[] | select(.parentId==0) | .id' | head -1)"
-CATEGORY_ID="$(echo "$TYPES" | jq -r --argjson tid "$TYPE_ID" '.[] | select(.parentId==$tid) | .id' | head -1)"
-CATEGORY_NAME="$(echo "$TYPES" | jq -r --argjson tid "$TYPE_ID" '.[] | select(.parentId==$tid) | .name' | head -1)"
-assert_eq "存在分类" "true" "$([[ -n "$CATEGORY_ID" ]] && echo true || echo false)"
+assert_eq "类型组合数 ≥5" "true" "$([[ "$(echo "$TYPES" | jq 'length')" -ge 5 ]] && echo true || echo false)"
+# 取 seed 中的「电气设备 / 线路老化」组合行作为隐患类型
+TYPE_ID="$(echo "$TYPES" | jq -r '.[] | select(.major=="电气设备" and .minor=="线路老化") | .id' | head -1)"
+TYPE_MAJOR="电气设备"
+TYPE_MINOR="线路老化"
+assert_eq "存在该组合" "true" "$([[ -n "$TYPE_ID" && "$TYPE_ID" != "null" ]] && echo true || echo false)"
+# 枚举维护：新增（复用既有大类 + 新小类）、重复组合 422、全新大类、改名、删除未引用类型
+NEWTYPE="$(curl -s -X POST "$BASE_URL/api/v1/hazard-types" "${AUTH[@]}" -H 'Content-Type: application/json' -d '{"major":"电气设备","minor":"E2E新小类"}')"
+NEWTYPE_ID="$(echo "$NEWTYPE" | jq -r '.id')"
+assert_eq "新增组合成功" "true" "$([[ -n "$NEWTYPE_ID" && "$NEWTYPE_ID" != "null" ]] && echo true || echo false)"
+assert_eq "新增组合大类正确" "电气设备" "$(echo "$NEWTYPE" | jq -r '.major')"
+assert_status "重复组合 422" 422 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/v1/hazard-types" "${AUTH[@]}" -H 'Content-Type: application/json' -d '{"major":"电气设备","minor":"E2E新小类"}')"
+BRANDNEW="$(curl -s -X POST "$BASE_URL/api/v1/hazard-types" "${AUTH[@]}" -H 'Content-Type: application/json' -d '{"major":"机械伤害","minor":"旋转部位无防护"}')"
+BRANDNEW_ID="$(echo "$BRANDNEW" | jq -r '.id')"
+assert_eq "支持全新大类" "机械伤害" "$(echo "$BRANDNEW" | jq -r '.major')"
+assert_status "更新组合 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$BASE_URL/api/v1/hazard-types/$BRANDNEW_ID" "${AUTH[@]}" -H 'Content-Type: application/json' -d '{"minor":"旋转部位无防护（改）"}')"
+assert_status "删除未引用类型 204" 204 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/hazard-types/$BRANDNEW_ID" "${AUTH[@]}")"
+# 缺大类/小类 422
+assert_status "缺小类 422" 422 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/v1/hazard-types" "${AUTH[@]}" -H 'Content-Type: application/json' -d '{"major":"电气设备"}')"
 
 echo "== 3. 图片上传与摘要去重 =="
 TMPDIR_E2E="$(mktemp -d)"
@@ -103,13 +117,13 @@ assert_status "非法文件类型 400" 400 "$(printf 'not an image' > "$TMPDIR_E
 
 echo "== 4. 新增隐患（默认值与联动） =="
 # 缺必填 422
-assert_status "缺责任单位 422" 422 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/v1/hazards" "${AUTH[@]}" -H 'Content-Type: application/json' -d '{"description":"缺单位测试","typeId":'"$TYPE_ID"',"categoryId":'"$CATEGORY_ID"'}')"
-# 分类不属于类型 422
-assert_status "分类不匹配 422" 422 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/v1/hazards" "${AUTH[@]}" -H 'Content-Type: application/json' -d "{\"description\":\"分类不匹配\",\"unitId\":$UNIT_ID,\"typeId\":$TYPE_ID,\"categoryId\":99999}")"
+assert_status "缺责任单位 422" 422 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/v1/hazards" "${AUTH[@]}" -H 'Content-Type: application/json' -d '{"description":"缺单位测试","typeId":'"$TYPE_ID"'}')"
+# 类型不存在 422
+assert_status "类型不存在 422" 422 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/v1/hazards" "${AUTH[@]}" -H 'Content-Type: application/json' -d "{\"description\":\"类型不存在\",\"unitId\":$UNIT_ID,\"typeId\":99999}")"
 
 TODAY="$(date +%F)"
 DUE_EXPECTED="$(date -d "$TODAY +7 days" +%F 2>/dev/null || date -v+7d +%F)"
-CREATE_BODY="{\"description\":\"E2E 配电箱线路老化，存在漏电风险\",\"suggestion\":\"更换老化线路\",\"unitId\":$UNIT_ID,\"typeId\":$TYPE_ID,\"categoryId\":$CATEGORY_ID,\"beforeImageIds\":[\"$IMG_ID\",\"$IMG_ID2\"],\"level\":\"重大隐患\",\"remark\":\"E2E 备注\"}"
+CREATE_BODY="{\"description\":\"E2E 配电箱线路老化，存在漏电风险\",\"suggestion\":\"更换老化线路\",\"unitId\":$UNIT_ID,\"typeId\":$TYPE_ID,\"beforeImageIds\":[\"$IMG_ID\",\"$IMG_ID2\"],\"level\":\"重大隐患\",\"remark\":\"E2E 备注\"}"
 CREATED="$(curl -s -X POST "$BASE_URL/api/v1/hazards" "${AUTH[@]}" -H 'Content-Type: application/json' -d "$CREATE_BODY")"
 HAZARD_ID="$(echo "$CREATED" | jq -r '.id')"
 assert_eq "检查区域默认华星现场" "华星现场" "$(echo "$CREATED" | jq -r '.inspectionArea')"
@@ -124,7 +138,10 @@ assert_eq "整改前图片数量 2" "2" "$(echo "$CREATED" | jq '.beforeImageIds
 
 echo "== 5. 列表 / 详情（JOIN 名称） =="
 assert_eq "详情单位名称非空" "$UNIT_NAME" "$(curl -s "$BASE_URL/api/v1/hazards/$HAZARD_ID" "${AUTH[@]}" | jq -r '.unitName')"
-assert_eq "详情分类名称非空" "$CATEGORY_NAME" "$(curl -s "$BASE_URL/api/v1/hazards/$HAZARD_ID" "${AUTH[@]}" | jq -r '.categoryName')"
+DETAIL_TYPE_MAJOR="$(curl -s "$BASE_URL/api/v1/hazards/$HAZARD_ID" "${AUTH[@]}" | jq -r '.typeMajor')"
+DETAIL_TYPE_MINOR="$(curl -s "$BASE_URL/api/v1/hazards/$HAZARD_ID" "${AUTH[@]}" | jq -r '.typeMinor')"
+assert_eq "详情类型大类正确" "$TYPE_MAJOR" "$DETAIL_TYPE_MAJOR"
+assert_eq "详情类型小类正确" "$TYPE_MINOR" "$DETAIL_TYPE_MINOR"
 LIST_TOTAL="$(curl -s "$BASE_URL/api/v1/hazards" "${AUTH[@]}" | jq -r '.pagination.total')"
 assert_eq "列表包含新增记录" "true" "$([[ "$LIST_TOTAL" -ge 1 ]] && echo true || echo false)"
 assert_status "详情 404（不存在）" 404 "$(http_code "$BASE_URL/api/v1/hazards/999999" "${AUTH[@]}")"
@@ -141,7 +158,8 @@ assert_eq "已整改数 ≥1" "true" "$([[ "$(echo "$STATS" | jq -r '.done')" -g
 
 echo "== 8. 删除保护 =="
 assert_status "删除被引用单位 409" 409 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/units/$UNIT_ID" "${AUTH[@]}")"
-assert_status "删除类型（有分类）409" 409 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/hazard-types/$TYPE_ID" "${AUTH[@]}")"
+assert_status "删除被引用类型 409" 409 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/hazard-types/$TYPE_ID" "${AUTH[@]}")"
+assert_status "删除未引用类型 204" 204 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/hazard-types/$NEWTYPE_ID" "${AUTH[@]}")"
 assert_status "删除不存在单位 404" 404 "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE_URL/api/v1/units/999999" "${AUTH[@]}")"
 
 echo "== 9. 软删除 =="

@@ -6,17 +6,15 @@ import {
   NForm,
   NFormItem,
   NInput,
-  NInputNumber,
   NModal,
-  NSelect,
-  NSwitch,
   NTag,
+  NAutoComplete,
   useDialog,
   useMessage,
   type DataTableColumns,
   type FormInst,
   type FormRules,
-  type SelectOption,
+  type AutoCompleteOption,
 } from 'naive-ui'
 
 import { client, errorMessage } from '@/api/client'
@@ -25,21 +23,9 @@ import type { components } from '@/api/schema'
 
 type HazardType = components['schemas']['HazardType']
 
-interface TypeRow {
-  id: number
-  parentId: number
-  name: string
-  sort: number
-  status: 0 | 1
-  kind: 'type' | 'category'
-  parentName: string
-}
-
 interface TypeFormModel {
-  name: string
-  parentId: number
-  sort: number
-  status: 0 | 1
+  major: string
+  minor: string
 }
 
 const message = useMessage()
@@ -52,40 +38,28 @@ const showModal = ref(false)
 const editingId = ref<number | null>(null)
 const saving = ref(false)
 const formRef = ref<FormInst | null>(null)
-const form = ref<TypeFormModel>({ name: '', parentId: 0, sort: 0, status: 1 })
+const form = ref<TypeFormModel>({ major: '', minor: '' })
 
-const parentOptions = computed<SelectOption[]>(() => [
-  { label: '（顶级）隐患类型', value: 0 },
-  ...list.value
-    .filter((t) => t.parentId === 0)
-    .sort((a, b) => a.sort - b.sort || a.id - b.id)
-    .map((t) => ({ label: `作为分类，归属：${t.name}`, value: t.id })),
-])
-
-const rows = computed<TypeRow[]>(() => {
-  const out: TypeRow[] = []
-  const roots = list.value
-    .filter((t) => t.parentId === 0)
-    .sort((a, b) => a.sort - b.sort || a.id - b.id)
-  for (const root of roots) {
-    out.push({ id: root.id, parentId: 0, name: root.name, sort: root.sort, status: root.status, kind: 'type', parentName: '' })
-    const children = list.value
-      .filter((t) => t.parentId === root.id)
-      .sort((a, b) => a.sort - b.sort || a.id - b.id)
-    for (const c of children) {
-      out.push({ id: c.id, parentId: c.parentId, name: c.name, sort: c.sort, status: c.status, kind: 'category', parentName: root.name })
+/** 已有大类（去重，作为大类下拉输入框的候选项）。 */
+const majorOptions = computed<AutoCompleteOption[]>(() => {
+  const seen = new Set<string>()
+  const options: AutoCompleteOption[] = []
+  for (const t of list.value) {
+    if (t.major && !seen.has(t.major)) {
+      seen.add(t.major)
+      options.push({ label: t.major, value: t.major })
     }
   }
-  return out
+  return options
 })
 
 const rules: FormRules = {
-  name: { required: true, message: '请输入名称', trigger: ['input', 'blur'] },
-  parentId: {
+  major: {
     required: true,
-    validator: () => (form.value.parentId >= 0 ? true : new Error('请选择归属')),
-    trigger: ['change'],
+    validator: () => (form.value.major.trim() ? true : new Error('请输入或选择大类')),
+    trigger: ['input', 'blur'],
   },
+  minor: { required: true, message: '请输入小类', trigger: ['input', 'blur'] },
 }
 
 async function loadList(): Promise<void> {
@@ -102,21 +76,15 @@ async function loadList(): Promise<void> {
   }
 }
 
-function openCreateType(): void {
+function openCreate(): void {
   editingId.value = null
-  form.value = { name: '', parentId: 0, sort: list.value.length, status: 1 }
+  form.value = { major: '', minor: '' }
   showModal.value = true
 }
 
-function openCreateCategory(root: TypeRow): void {
-  editingId.value = null
-  form.value = { name: '', parentId: root.id, sort: list.value.length, status: 1 }
-  showModal.value = true
-}
-
-function openEdit(row: TypeRow): void {
+function openEdit(row: HazardType): void {
   editingId.value = row.id
-  form.value = { name: row.name, parentId: row.parentId, sort: row.sort, status: row.status }
+  form.value = { major: row.major, minor: row.minor }
   showModal.value = true
 }
 
@@ -128,15 +96,9 @@ async function handleSave(): Promise<void> {
   }
   saving.value = true
   try {
+    const body = { major: form.value.major.trim(), minor: form.value.minor.trim() }
     if (editingId.value === null) {
-      const { error } = await client.POST('/hazard-types', {
-        body: {
-          name: form.value.name.trim(),
-          parentId: form.value.parentId,
-          sort: form.value.sort,
-          status: form.value.status,
-        },
-      })
+      const { error } = await client.POST('/hazard-types', { body })
       if (error) {
         message.error(errorMessage(error))
         return
@@ -145,12 +107,7 @@ async function handleSave(): Promise<void> {
     } else {
       const { error } = await client.PUT('/hazard-types/{id}', {
         params: { path: { id: editingId.value } },
-        body: {
-          name: form.value.name.trim(),
-          parentId: form.value.parentId,
-          sort: form.value.sort,
-          status: form.value.status,
-        },
+        body,
       })
       if (error) {
         message.error(errorMessage(error))
@@ -165,73 +122,51 @@ async function handleSave(): Promise<void> {
   }
 }
 
-function confirmDelete(row: TypeRow): void {
+/** 删除按钮位于编辑弹窗内：被隐患引用的类型会被后端拒绝（只能修改）。 */
+function confirmDelete(): void {
+  const row = list.value.find((t) => t.id === editingId.value)
+  if (!row) {
+    return
+  }
   dialog.warning({
-    title: '删除类型/分类',
-    content: `确定删除「${row.name}」吗？存在子分类或被隐患引用的无法删除。`,
+    title: '删除隐患类型',
+    content: `确定删除「${row.major} / ${row.minor}」吗？已被隐患记录引用的类型无法删除，只能修改。`,
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: async () => {
-      const { error } = await client.DELETE('/hazard-types/{id}', { params: { path: { id: row.id } } })
+      const { error } = await client.DELETE('/hazard-types/{id}', {
+        params: { path: { id: row.id } },
+      })
       if (error) {
         message.error(errorMessage(error))
         return
       }
       message.success('已删除')
+      showModal.value = false
       void loadList()
     },
   })
 }
 
-const columns: DataTableColumns<TypeRow> = [
+const columns: DataTableColumns<HazardType> = [
   { title: 'ID', key: 'id', width: 70 },
   {
-    title: '名称',
-    key: 'name',
-    minWidth: 200,
+    title: '大类',
+    key: 'major',
+    minWidth: 180,
     render: (row) =>
-      h(
-        'div',
-        { style: `display:flex;align-items:center;gap:8px;${row.kind === 'category' ? 'padding-left:28px;' : ''}` },
-        [
-          h(
-            NTag,
-            { size: 'small', type: row.kind === 'type' ? 'info' : 'default', bordered: false },
-            { default: () => (row.kind === 'type' ? '类型' : '分类') },
-          ),
-          h('span', row.name),
-        ],
-      ),
+      h('span', { style: 'display:inline-flex;align-items:center;gap:8px' }, [
+        h(NTag, { size: 'small', type: 'info', bordered: false }, { default: () => row.major }),
+      ]),
   },
-  {
-    title: '归属',
-    key: 'parentName',
-    width: 130,
-    render: (row) => (row.kind === 'category' ? row.parentName : '—'),
-  },
-  { title: '排序', key: 'sort', width: 80 },
-  {
-    title: '状态',
-    key: 'status',
-    width: 90,
-    render: (row) =>
-      h(
-        NTag,
-        { size: 'small', type: row.status === 1 ? 'success' : 'default', bordered: false },
-        { default: () => (row.status === 1 ? '启用' : '停用') },
-      ),
-  },
+  { title: '小类', key: 'minor', minWidth: 200 },
   {
     title: '操作',
     key: 'actions',
-    width: 190,
+    width: 110,
     render: (row) =>
-      h('div', { style: 'display:flex;gap:4px' }, [
-        row.kind === 'type'
-          ? h(NButton, { size: 'small', text: true, type: 'primary', onClick: () => openCreateCategory(row) }, { default: () => '新增分类' })
-          : null,
-        h(NButton, { size: 'small', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' }),
-        h(NButton, { size: 'small', text: true, type: 'error', onClick: () => confirmDelete(row) }, { default: () => '删除' }),
+      h('div', { style: 'display:flex;gap:8px' }, [
+        h(NButton, { size: 'small', onClick: () => openEdit(row) }, { default: () => '编辑' }),
       ]),
   },
 ]
@@ -242,43 +177,50 @@ onMounted(loadList)
 <template>
   <div>
     <div class="page-toolbar">
-      <span class="hint">大类为「隐患类型」，其下为「隐患分类」，两级共用一张表</span>
       <div class="spacer" />
-      <n-button type="primary" @click="openCreateType">新增类型</n-button>
+      <n-button type="primary" @click="openCreate">新增隐患类型</n-button>
     </div>
     <n-data-table
       :columns="columns"
-      :data="rows"
+      :data="list"
       :loading="loading"
       :bordered="false"
-      :row-key="(row: TypeRow) => row.id"
+      size="small"
+      :row-key="(row: HazardType) => row.id"
     />
 
     <n-modal
       v-model:show="showModal"
       preset="card"
-      :title="editingId === null ? '新增类型/分类' : '编辑类型/分类'"
-      style="width: 480px"
+      draggable
+      :title="editingId === null ? '新增隐患类型' : '编辑隐患类型'"
+      style="width: 520px"
       :mask-closable="false"
     >
-      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="86">
-        <n-form-item label="名称" path="name">
-          <n-input v-model:value="form.name" placeholder="如：线路老化" />
+      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="72">
+        <n-form-item label="大类" path="major">
+          <n-auto-complete
+            v-model:value="form.major"
+            :options="majorOptions"
+            placeholder="可下拉选择已有大类，也可直接输入新大类"
+            clearable
+          />
         </n-form-item>
-        <n-form-item label="归属" path="parentId">
-          <n-select v-model:value="form.parentId" :options="parentOptions" />
-        </n-form-item>
-        <n-form-item label="排序">
-          <n-input-number v-model:value="form.sort" :min="0" style="width: 100%" />
-        </n-form-item>
-        <n-form-item label="启用">
-          <n-switch v-model:value="form.status" :checked-value="1" :unchecked-value="0" />
+        <n-form-item label="小类" path="minor">
+          <n-input v-model:value="form.minor" placeholder="如：线路老化" />
         </n-form-item>
       </n-form>
       <template #footer>
-        <div style="display: flex; justify-content: flex-end; gap: 8px">
-          <n-button @click="showModal = false">取消</n-button>
-          <n-button type="primary" :loading="saving" @click="handleSave">保存</n-button>
+        <div class="modal-footer">
+          <div class="modal-footer-left">
+            <n-button v-if="editingId !== null" type="error" secondary @click="confirmDelete">
+              删除
+            </n-button>
+          </div>
+          <div class="modal-footer-right">
+            <n-button @click="showModal = false">取消</n-button>
+            <n-button type="primary" :loading="saving" @click="handleSave">保存</n-button>
+          </div>
         </div>
       </template>
     </n-modal>
@@ -286,8 +228,15 @@ onMounted(loadList)
 </template>
 
 <style scoped>
-.hint {
-  font-size: 13px;
-  color: #6b7a90;
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.modal-footer-right {
+  display: flex;
+  gap: 8px;
 }
 </style>
