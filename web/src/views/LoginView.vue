@@ -54,7 +54,7 @@ async function handleSubmit(): Promise<void> {
   <div class="login-page">
     <div class="login-card">
       <div class="login-head">
-        <div class="login-mark">危</div>
+        <img class="login-logo" src="/logo.png" alt="电气车间隐患闭环系统" />
         <h1 class="login-title">电气车间隐患闭环系统</h1>
         <p class="login-sub">Hazard Closed-Loop Management</p>
       </div>
@@ -104,18 +104,12 @@ async function handleSubmit(): Promise<void> {
   margin-bottom: 28px;
 }
 
-.login-mark {
+.login-logo {
   width: 52px;
   height: 52px;
+  display: block;
   margin: 0 auto 12px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #1668dc, #4098fc);
-  color: #fff;
-  font-size: 26px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  object-fit: contain;
 }
 
 .login-title {
