@@ -6,7 +6,6 @@ import MainLayout from '@/layouts/MainLayout.vue'
 import LoginView from '@/views/LoginView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import HazardListView from '@/views/HazardListView.vue'
-import HazardFormView from '@/views/HazardFormView.vue'
 import UnitManage from '@/views/system/UnitManage.vue'
 import TypeManage from '@/views/system/TypeManage.vue'
 import AttachmentManage from '@/views/system/AttachmentManage.vue'
@@ -26,8 +25,9 @@ const routes: RouteRecordRaw[] = [
       { path: '', redirect: '/dashboard' },
       { path: 'dashboard', name: 'dashboard', component: DashboardView, meta: { title: '工作台' } },
       { path: 'hazards', name: 'hazards', component: HazardListView, meta: { title: '隐患管理' } },
-      { path: 'hazards/new', name: 'hazard-create', component: HazardFormView, meta: { title: '新增隐患' } },
-      { path: 'hazards/:id/edit', name: 'hazard-edit', component: HazardFormView, meta: { title: '编辑隐患' } },
+      // 隐患新增/编辑已改为列表页内弹窗，老页面链接重定向回列表。
+      { path: 'hazards/new', redirect: '/hazards' },
+      { path: 'hazards/:id/edit', redirect: '/hazards' },
       { path: 'system/units', name: 'system-units', component: UnitManage, meta: { title: '责任单位' } },
       { path: 'system/types', name: 'system-types', component: TypeManage, meta: { title: '隐患类型' } },
       {
