@@ -171,7 +171,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** 附件（图片）分页列表（含隐患引用次数，可只看未引用） */
+        get: operations["listImages"];
         put?: never;
         /** 上传图片（SHA-256 摘要去重：同图返回既有 uuid，不重复保存） */
         post: operations["uploadImage"];
@@ -192,7 +193,8 @@ export interface paths {
         get: operations["getImage"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** 删除附件（连同落盘文件与缩略图；被隐患引用时拒绝 409） */
+        delete: operations["deleteImage"];
         options?: never;
         head?: never;
         patch?: never;
@@ -473,6 +475,26 @@ export interface components {
              * @default false
              */
             duplicate: boolean;
+        };
+        /** @description 附件列表项（不含 digest 细节，附带隐患引用计数） */
+        ImageSummary: {
+            /** @description uuid（32 位十六进制） */
+            id: string;
+            mimeType: string;
+            /** Format: int64 */
+            sizeBytes: number;
+            width?: number | null;
+            height?: number | null;
+            /** @description 被多少条隐患记录引用（整改前/整改后图片合计） */
+            refCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            url: string;
+            thumbnailUrl: string;
+        };
+        ImageListResponse: {
+            items: components["schemas"]["ImageSummary"][];
+            pagination: components["schemas"]["Pagination"];
         };
     };
     responses: {
@@ -934,6 +956,34 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
+    listImages: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                /** @description 为 true 时仅返回未被任何隐患引用的附件 */
+                onlyUnused?: boolean;
+                /** @description 按 uuid / SHA-256 摘要前缀匹配 */
+                keyword?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分页结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageListResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     uploadImage: {
         parameters: {
             query?: never;
@@ -991,6 +1041,29 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    deleteImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除成功 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getImageThumbnail: {

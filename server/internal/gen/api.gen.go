@@ -244,6 +244,29 @@ type ImageInfo struct {
 	Width *int   `json:"width"`
 }
 
+// ImageListResponse defines model for ImageListResponse.
+type ImageListResponse struct {
+	Items      []ImageSummary `json:"items"`
+	Pagination Pagination     `json:"pagination"`
+}
+
+// ImageSummary 附件列表项（不含 digest 细节，附带隐患引用计数）
+type ImageSummary struct {
+	CreatedAt time.Time `json:"createdAt"`
+	Height    *int      `json:"height"`
+
+	// Id uuid（32 位十六进制）
+	Id       string `json:"id"`
+	MimeType string `json:"mimeType"`
+
+	// RefCount 被多少条隐患记录引用（整改前/整改后图片合计）
+	RefCount     int    `json:"refCount"`
+	SizeBytes    int64  `json:"sizeBytes"`
+	ThumbnailUrl string `json:"thumbnailUrl"`
+	Url          string `json:"url"`
+	Width        *int   `json:"width"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Password string `json:"password"`
@@ -363,6 +386,18 @@ type ListHazardsParams struct {
 	DateTo *openapi_types.Date `form:"dateTo,omitempty" json:"dateTo,omitempty"`
 }
 
+// ListImagesParams defines parameters for ListImages.
+type ListImagesParams struct {
+	Page     *int `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+
+	// OnlyUnused 为 true 时仅返回未被任何隐患引用的附件
+	OnlyUnused *bool `form:"onlyUnused,omitempty" json:"onlyUnused,omitempty"`
+
+	// Keyword 按 uuid / SHA-256 摘要前缀匹配
+	Keyword *string `form:"keyword,omitempty" json:"keyword,omitempty"`
+}
+
 // UploadImageMultipartBody defines parameters for UploadImage.
 type UploadImageMultipartBody struct {
 	// File 图片文件，白名单 jpeg/png/webp/gif，默认上限 10MB
@@ -436,9 +471,15 @@ type ServerInterface interface {
 	// 更新隐患记录（部分字段）
 	// (PUT /hazards/{id})
 	UpdateHazard(c *gin.Context, id int64)
+	// 附件（图片）分页列表（含隐患引用次数，可只看未引用）
+	// (GET /images)
+	ListImages(c *gin.Context, params ListImagesParams)
 	// 上传图片（SHA-256 摘要去重：同图返回既有 uuid，不重复保存）
 	// (POST /images)
 	UploadImage(c *gin.Context)
+	// 删除附件（连同落盘文件与缩略图；被隐患引用时拒绝 409）
+	// (DELETE /images/{id})
+	DeleteImage(c *gin.Context, id string)
 	// 获取原图（按 uuid）
 	// (GET /images/{id})
 	GetImage(c *gin.Context, id string)
@@ -786,6 +827,58 @@ func (siw *ServerInterfaceWrapper) UpdateHazard(c *gin.Context) {
 	siw.Handler.UpdateHazard(c, id)
 }
 
+// ListImages operation middleware
+func (siw *ServerInterfaceWrapper) ListImages(c *gin.Context) {
+
+	var err error
+
+	c.Set(BearerAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListImagesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "onlyUnused" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "onlyUnused", c.Request.URL.Query(), &params.OnlyUnused)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter onlyUnused: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "keyword" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "keyword", c.Request.URL.Query(), &params.Keyword)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter keyword: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListImages(c, params)
+}
+
 // UploadImage operation middleware
 func (siw *ServerInterfaceWrapper) UploadImage(c *gin.Context) {
 
@@ -799,6 +892,32 @@ func (siw *ServerInterfaceWrapper) UploadImage(c *gin.Context) {
 	}
 
 	siw.Handler.UploadImage(c)
+}
+
+// DeleteImage operation middleware
+func (siw *ServerInterfaceWrapper) DeleteImage(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteImage(c, id)
 }
 
 // GetImage operation middleware
@@ -987,7 +1106,9 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/hazards/:id", wrapper.DeleteHazard)
 	router.GET(options.BaseURL+"/hazards/:id", wrapper.GetHazard)
 	router.PUT(options.BaseURL+"/hazards/:id", wrapper.UpdateHazard)
+	router.GET(options.BaseURL+"/images", wrapper.ListImages)
 	router.POST(options.BaseURL+"/images", wrapper.UploadImage)
+	router.DELETE(options.BaseURL+"/images/:id", wrapper.DeleteImage)
 	router.GET(options.BaseURL+"/images/:id", wrapper.GetImage)
 	router.GET(options.BaseURL+"/images/:id/thumbnail", wrapper.GetImageThumbnail)
 	router.GET(options.BaseURL+"/units", wrapper.ListUnits)

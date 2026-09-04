@@ -18,6 +18,7 @@ type Server struct {
 	hazards  *service.HazardService
 	units    *service.UnitService
 	types    *service.TypeService
+	images   *service.ImageService
 	auth     *auth.Manager
 	store    *upload.Store
 	maxBytes int64
@@ -28,11 +29,12 @@ func NewServer(
 	hazards *service.HazardService,
 	units *service.UnitService,
 	types *service.TypeService,
+	images *service.ImageService,
 	am *auth.Manager,
 	store *upload.Store,
 	maxBytes int64,
 ) *Server {
-	return &Server{hazards: hazards, units: units, types: types, auth: am, store: store, maxBytes: maxBytes}
+	return &Server{hazards: hazards, units: units, types: types, images: images, auth: am, store: store, maxBytes: maxBytes}
 }
 
 // ---- 鉴权 ----
@@ -250,6 +252,25 @@ func (s *Server) DeleteHazardType(c *gin.Context, id int64) {
 }
 
 // ---- 图片 ----
+
+// ListImages 附件分页列表（含引用计数）。
+func (s *Server) ListImages(c *gin.Context, params gen.ListImagesParams) {
+	resp, appErr := s.images.List(params)
+	if appErr != nil {
+		writeServiceError(c, appErr)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// DeleteImage 删除未被引用的附件。
+func (s *Server) DeleteImage(c *gin.Context, id string) {
+	if appErr := s.images.Delete(id); appErr != nil {
+		writeServiceError(c, appErr)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
 
 // UploadImage 上传图片（摘要去重）。
 func (s *Server) UploadImage(c *gin.Context) {

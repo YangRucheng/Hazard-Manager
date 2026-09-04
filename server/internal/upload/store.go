@@ -170,6 +170,31 @@ func (s *Store) ResolveThumbnail(id string) (path string, mimeType string, ok bo
 	return s.Resolve(id)
 }
 
+// Remove 删除 uuid 对应的落盘原图与缩略图（文件不存在视为成功）。
+func (s *Store) Remove(id string) error {
+	var img model.Image
+	err := s.db.Where("id = ?", id).First(&img).Error
+	ext := ""
+	switch {
+	case err == nil:
+		if e, ok := AllowedMimeTypes[img.MimeType]; ok {
+			ext = e
+		}
+	case !errors.Is(err, gorm.ErrRecordNotFound):
+		return fmt.Errorf("查询图片记录失败: %w", err)
+	}
+	targets := []string{filepath.Join(s.dir, "thumbs", id+".jpg")}
+	if ext != "" {
+		targets = append(targets, filepath.Join(s.dir, id+"."+ext))
+	}
+	for _, p := range targets {
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("删除图片文件失败: %w", err)
+		}
+	}
+	return nil
+}
+
 // toResult 将图片模型转为上传结果（URL 为相对路径）。
 func (s *Store) toResult(img model.Image, duplicate bool) *Result {
 	return &Result{

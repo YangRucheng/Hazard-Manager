@@ -49,8 +49,9 @@ func main() {
 	hazardSvc := service.NewHazardService(hazardRepo, unitRepo, typeRepo, imageRepo)
 	unitSvc := service.NewUnitService(unitRepo, hazardRepo)
 	typeSvc := service.NewTypeService(typeRepo, hazardRepo)
+	imageSvc := service.NewImageService(imageRepo, store)
 
-	srv := handler.NewServer(hazardSvc, unitSvc, typeSvc, am, store, cfg.MaxUploadBytes)
+	srv := handler.NewServer(hazardSvc, unitSvc, typeSvc, imageSvc, am, store, cfg.MaxUploadBytes)
 
 	engine := router.NewRouter(srv, am)
 

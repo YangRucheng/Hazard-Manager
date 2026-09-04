@@ -414,6 +414,36 @@ paths:
           $ref: '#/components/responses/Unauthorized'
 
   /images:
+    get:
+      tags: [images]
+      operationId: listImages
+      summary: 附件（图片）分页列表（含隐患引用次数，可只看未引用）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: onlyUnused
+          in: query
+          description: 为 true 时仅返回未被任何隐患引用的附件
+          schema: { type: boolean, default: false }
+        - name: keyword
+          in: query
+          description: 按 uuid / SHA-256 摘要前缀匹配
+          schema: { type: string }
+      responses:
+        '200':
+          description: 分页结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
       tags: [images]
       operationId: uploadImage
@@ -469,6 +499,26 @@ paths:
               schema: { type: string, format: binary }
         '404':
           $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [images]
+      operationId: deleteImage
+      summary: 删除附件（连同落盘文件与缩略图；被隐患引用时拒绝 409）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-f]{32}$' }
+      responses:
+        '204':
+          description: 删除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /images/{id}/thumbnail:
@@ -712,6 +762,30 @@ components:
         url: { type: string, description: '相对路径，形如 /api/v1/images/860e...' }
         thumbnailUrl: { type: string, description: '相对路径，形如 /api/v1/images/860e.../thumbnail' }
         duplicate: { type: boolean, default: false, description: 是否命中既有摘要（未重复保存） }
+    ImageSummary:
+      type: object
+      description: 附件列表项（不含 digest 细节，附带隐患引用计数）
+      required: [id, mimeType, sizeBytes, refCount, createdAt, url, thumbnailUrl]
+      properties:
+        id: { type: string, description: uuid（32 位十六进制） }
+        mimeType: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+        refCount: { type: integer, description: 被多少条隐患记录引用（整改前/整改后图片合计） }
+        createdAt: { type: string, format: date-time }
+        url: { type: string }
+        thumbnailUrl: { type: string }
+    ImageListResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
   responses:
     Unauthorized:
       description: 未认证或令牌无效/过期
