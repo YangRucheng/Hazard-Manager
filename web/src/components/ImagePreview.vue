@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { NImage, NImageGroup, NEmpty } from 'naive-ui'
+import { NEmpty, NImageGroup } from 'naive-ui'
 
+import AuthImage from '@/components/AuthImage.vue'
 import { thumbnailUrl, imageUrl } from '@/api/client'
 
 const props = withDefaults(defineProps<{ imageIds: string[] | undefined | null; size?: number }>(), {
@@ -17,14 +18,13 @@ const props = withDefaults(defineProps<{ imageIds: string[] | undefined | null; 
   />
   <n-image-group v-else>
     <div class="image-preview" :style="{ gap: `${Math.max(4, Math.floor(props.size / 8))}px` }">
-      <n-image
+      <AuthImage
         v-for="id in props.imageIds"
         :key="id"
-        :src="thumbnailUrl(id)"
-        :preview-src="imageUrl(id)"
+        :url="thumbnailUrl(id)"
+        :preview-url="imageUrl(id)"
         :width="props.size"
         :height="props.size"
-        object-fit="cover"
         class="preview-item"
       />
     </div>
